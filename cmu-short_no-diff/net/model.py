@@ -298,7 +298,9 @@ class Decoder(nn.Module):
                 ins_a = ins_p-pred_all[step-2]-ins_v # ins_v-(pred_all[step-2]-pred_all[step-3])
                 ins_v_dec = pred_all[step-1]-pred_all[step-2]
             n = torch.randn(ins_p.size()).cuda()*0.0005
-            ins = torch.cat((ins_p+n, ins_v, ins_a), dim=-1)
+            #ins = torch.cat((ins_p+n, ins_v, ins_a), dim=-1)
+            # NOTE: remove velocity and acceleration
+            ins = ins_p+n
             pred_, hidden, res_ = self.step_forward(ins, hidden, step)
             pred_all.append(pred_)                                                 # [t, 64, 21, 3]
             res_all.append(res_)
