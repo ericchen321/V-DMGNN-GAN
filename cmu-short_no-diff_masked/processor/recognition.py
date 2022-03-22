@@ -50,6 +50,7 @@ class REC_Processor(Processor):
         self.relsend_part = torch.FloatTensor(np.array(encode_onehot(np.where(off_diag_part)[0]), dtype=np.float32)).to(self.dev)
         self.relrec_body = torch.FloatTensor(np.array(encode_onehot(np.where(off_diag_body)[1]), dtype=np.float32)).to(self.dev)
         self.relsend_body = torch.FloatTensor(np.array(encode_onehot(np.where(off_diag_body)[0]), dtype=np.float32)).to(self.dev)
+        self.lower_body_joints = [0, 1, 2, 3, 4, 5, 6, 7]
         
     def load_optimizer(self):
         if self.arg.optimizer == 'SGD':
@@ -79,14 +80,43 @@ class REC_Processor(Processor):
             raise ValueError('No such Optimizer')
 
 
-    def loss_l1(self, pred, target, mask=None):
-        dist = torch.abs(pred-target).mean(-1).mean(1).mean(0)
+    def loss_l1(self, pred, target, mask=None, st_mask=None):
+        if st_mask is None:
+            dist = torch.abs(pred-target).mean(-1).mean(1).mean(0)
+        else:
+            # NOTE by Eric:
+            # pred has shape batch_size, J, T, 3;
+            # st_mask has shape batch_size, T, Jx3
+            st_mask_xformed = st_mask.view(pred.shape[0], pred.shape[2], -1, 3).permute(0, 2, 1, 3)
+            dist = torch.abs(
+                pred*st_mask_xformed-target*st_mask_xformed
+            ).mean(-1).mean(1).mean(0)
+        
         if mask is not None:
             dist = dist * mask
         loss = torch.mean(dist)
         return loss
 
 
+    def build_masking_matrix(self, unmasked_matrix, joint_indices):
+        r"""
+        Build masking matrix with same shape as `unmasked_matrix`
+        """
+        M = np.ones_like(unmasked_matrix)
+        M = M.reshape(M.shape[0], M.shape[1], -1, 3) # batch size, T, J, 3
+        M[:, :, joint_indices, :] = np.zeros((3,))
+        M = M.reshape(unmasked_matrix.shape)
+        return M
+    
+    def build_lower_body_masking_matrices(self, lower_body_joints, encoder_inputs, decoder_inputs, targets):
+        # build encoder input mask
+        M_enc_in = self.build_masking_matrix(encoder_inputs, lower_body_joints)
+        # build decoder input mask
+        M_dec_in = self.build_masking_matrix(decoder_inputs, lower_body_joints)
+        # build decoder output / target mask
+        M_dec_out = self.build_masking_matrix(targets, lower_body_joints)
+        return M_enc_in, M_dec_in, M_dec_out
+    
     def train(self):
         self.model.train()
         self.adjust_lr()
@@ -98,6 +128,18 @@ class REC_Processor(Processor):
                                                                self.arg.source_seq_len, 
                                                                self.arg.target_seq_len, 
                                                                len(self.dim_use))
+        #build lower-body masking matrices
+        self.M_enc_in, self.M_dec_in, self.M_dec_out = self.build_lower_body_masking_matrices(
+            self.lower_body_joints,
+            encoder_inputs,
+            decoder_inputs,
+            targets
+        )
+        
+        #mask encoder inputs and decoder inputs
+        encoder_inputs = np.multiply(self.M_enc_in, encoder_inputs)
+        decoder_inputs = np.multiply(self.M_dec_in, decoder_inputs)
+
         encoder_inputs_v = np.zeros_like(encoder_inputs)
         encoder_inputs_v[:, 1:, :] = encoder_inputs[:, 1:, :]-encoder_inputs[:, :-1, :]
         encoder_inputs_a = np.zeros_like(encoder_inputs)
@@ -129,7 +171,9 @@ class REC_Processor(Processor):
                              self.relsend_body,
                              self.arg.lamda)
 
-        loss = self.loss_l1(outputs, targets)
+        # convert spatio-temporal masking matrix to a tensor
+        st_mask = torch.from_numpy(self.M_dec_out).to(self.dev)
+        loss = self.loss_l1(outputs, targets, st_mask=st_mask)
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -162,6 +206,19 @@ class REC_Processor(Processor):
                                                                   self.arg.source_seq_len, 
                                                                   self.arg.target_seq_len, 
                                                                   len(self.dim_use))
+
+            #build lower-body masking matrices
+            self.M_enc_in, self.M_dec_in, self.M_dec_out = self.build_lower_body_masking_matrices(
+                self.lower_body_joints,
+                encoder_inputs,
+                decoder_inputs,
+                targets
+            )
+            
+            #mask encoder inputs and decoder inputs
+            encoder_inputs = np.multiply(self.M_enc_in, encoder_inputs)
+            decoder_inputs = np.multiply(self.M_dec_in, decoder_inputs)
+
             encoder_inputs_v = np.zeros_like(encoder_inputs)
             encoder_inputs_v[:, 1:, :] = encoder_inputs[:, 1:, :]-encoder_inputs[:, :-1, :]
             encoder_inputs_a = np.zeros_like(encoder_inputs)
