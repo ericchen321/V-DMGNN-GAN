@@ -104,6 +104,9 @@ if __name__ == '__main__':
         8, 0, 1, 2, 8, 4, 5, 6, 9, 10, 11, -1, 11, 12, 10, 14, 15, 16, 17, 16, 11, 20, 21, 22, 23, 22
     ])
 
+    # define bone length for visualization
+    bone_length = 2.0
+
     # convert joint angles to joint positions in
     # the world frame
     encoder_inputs_4d = np.load(
@@ -112,7 +115,7 @@ if __name__ == '__main__':
     encoder_inputs_cartesian = compute_joint_pos(
         encoder_inputs_4d,
         cmu_parents,
-        1.5
+        bone_length
     )
     print(encoder_inputs_cartesian.shape)
 
@@ -120,11 +123,27 @@ if __name__ == '__main__':
     for time_id in range(encoder_inputs_cartesian.shape[1]):
         fig = plt.figure(figsize=(12, 12))
         ax = fig.add_subplot(projection='3d')
-        neighbor_link_ = [(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(1,9),(5,9),
-                            (9,10),(10,11),(11,12),(12,13),(13,14),
-                            (11,15),(15,16),(16,17),(17,18),(18,19),(17,20),
-                            (12,21),(21,22),(22,23),(23,24),(24,25),(23,26)]
-        neighbor_link = [(i-1,j-1) for (i,j) in neighbor_link_]
+        # build bones
+        neighbor_link_partition = {
+            "left_arm": [
+                (10, 14), (14, 15), (15, 16), (16, 19), (16, 17), (17, 18)
+            ],
+            "right_arm": [
+                (11, 20), (20, 21), (21, 22), (22, 23), (23, 24), (23, 25)
+            ],
+            "torso": [
+                (8, 9), (9, 10), (10, 11)
+            ],
+            "head": [
+                (11, 12), (12, 13)
+            ],
+            "left_leg": [
+                (0, 8), (0, 1), (1, 2), (2, 3)
+            ],
+            "right_leg": [
+                (4, 8), (4, 5), (5, 6), (6, 7)
+            ]
+        }
         encoder_inputs_sample_x_time_t = encoder_inputs_cartesian[4, time_id, :].reshape(-1, 3) # J, 3
         #print(encoder_inputs_sample_x_time_t.shape)
         #plot joints
@@ -133,17 +152,32 @@ if __name__ == '__main__':
             encoder_inputs_sample_x_time_t[:, 1],
             encoder_inputs_sample_x_time_t[:, 2])
         #plot bones
-        for bone in neighbor_link:
-            ax.plot(encoder_inputs_sample_x_time_t[bone, 0],
-                encoder_inputs_sample_x_time_t[bone, 1],
-                encoder_inputs_sample_x_time_t[bone, 2],
-                'ro-')
+        for part_name, part_links in neighbor_link_partition.items():
+            if part_name == "left_arm" or part_name == "right_arm":
+                link_color = "red"
+                link_width = 2
+            elif part_name == "torso":
+                link_color = "cyan"
+                link_width = 4
+            elif part_name == "head":
+                link_color = "purple"
+                link_width = 2
+            else:
+                link_color = "green"
+                link_width = 2
+            for bone in part_links:
+                ax.plot(encoder_inputs_sample_x_time_t[bone, 0],
+                    encoder_inputs_sample_x_time_t[bone, 1],
+                    encoder_inputs_sample_x_time_t[bone, 2],
+                    color = link_color,
+                    linewidth = link_width)
         #label joints
         for joint_index in range(encoder_inputs_sample_x_time_t.shape[0]):
             ax.text(encoder_inputs_sample_x_time_t[joint_index, 0],
                 encoder_inputs_sample_x_time_t[joint_index, 1],
                 encoder_inputs_sample_x_time_t[joint_index, 2],
                 f"{joint_index}",
+                fontsize = 12,
                 color="blue")
         plt.savefig(f"skeletons/skeleton_<{time_id}>.png")
         plt.close(fig)
