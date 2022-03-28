@@ -103,7 +103,8 @@ def train_sample(data_set, batch_size, source_seq_len, target_seq_len, input_siz
     # #visualize joints
     # import matplotlib.pyplot as plt
 
-    # for time_id in range(encoder_inputs.shape[1]):
+    # encoder_inputs_cartesian = self.encoder_inputs_exp2cart(encoder_inputs)
+    # for time_id in range(encoder_inputs_cartesian.shape[1]):
     #     fig = plt.figure(figsize=(12, 12))
     #     ax = fig.add_subplot(projection='3d')
     #     neighbor_link_ = [(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(1,9),(5,9),
@@ -111,7 +112,7 @@ def train_sample(data_set, batch_size, source_seq_len, target_seq_len, input_siz
     #                         (11,15),(15,16),(16,17),(17,18),(18,19),(17,20),
     #                         (12,21),(21,22),(22,23),(23,24),(24,25),(23,26)]
     #     neighbor_link = [(i-1,j-1) for (i,j) in neighbor_link_]
-    #     encoder_inputs_sample_x_time_t = encoder_inputs[4, time_id, :].reshape(-1, 3) # J, 3
+    #     encoder_inputs_sample_x_time_t = encoder_inputs_cartesian[4, time_id, :].reshape(-1, 3) # J, 3
     #     #print(encoder_inputs_sample_x_time_t.shape)
     #     #plot joints
     #     ax.scatter(
@@ -136,6 +137,20 @@ def train_sample(data_set, batch_size, source_seq_len, target_seq_len, input_siz
     # print(f"plotted {encoder_inputs.shape[1]} skeletons")
     # while True:
     #     continue
+    
+    #save joints
+    encoder_inputs_4d = encoder_inputs.reshape(
+        encoder_inputs.shape[0],
+        encoder_inputs.shape[1],
+        -1,
+        3
+    )
+    np.save(
+        "/home/eric/eece571f/DMGNN/cmu-short_no-diff_masked/visualize/encoder_inputs.npy",
+        encoder_inputs_4d)
+    print(f"encoder inputs saved, shape: {encoder_inputs_4d.shape}")
+    while True:
+        continue
     return encoder_inputs, decoder_inputs, decoder_outputs
 
 
