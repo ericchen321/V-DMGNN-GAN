@@ -132,4 +132,4 @@ dmypy.json
 work_dir/
 
 # skeleton visualizations
-skeletons/
+skeletons_*/
