@@ -74,7 +74,8 @@ def normalization_stats(complete_data):
 def normalize_data(data_set, data_mean, data_std, dim_to_use):
     data_out = {}
     for key in data_set.keys():
-        data_out[key] = np.divide((data_set[key]-data_mean), data_std)
+        #data_out[key] = np.divide((data_set[key]-data_mean), data_std)
+        data_out[key] = data_set[key]
         data_out[key] = data_out[key][:,dim_to_use]
     return data_out
 
@@ -146,7 +147,7 @@ def train_sample(data_set, batch_size, source_seq_len, target_seq_len, input_siz
         3
     )
     np.save(
-        "/home/eric/eece571f/DMGNN/cmu-short_no-diff_masked/visualize/encoder_inputs.npy",
+        "/home/eric/eece571f/DMGNN/cmu-short_no-diff_masked/visualize/encoder_inputs_26_joints_walking.npy",
         encoder_inputs_4d)
     print(f"encoder inputs saved, shape: {encoder_inputs_4d.shape}")
     while True:
@@ -373,9 +374,9 @@ def revert_coordinate_space(channels, R0, T0):
     return channels_rec
 
 
-def fkl(angles, parent, offset, rotInd, expmapInd):
+def fkl(angles, parent, offset, posInd, expmapInd):
     # NOTE by Eric: this might be the code to do forward kinematics
-    njoints   = 38
+    njoints   = 26
     xyzStruct = [dict() for x in range(njoints)]
 
     for i in np.arange( njoints ):
