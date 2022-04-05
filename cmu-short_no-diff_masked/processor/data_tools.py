@@ -74,8 +74,7 @@ def normalization_stats(complete_data):
 def normalize_data(data_set, data_mean, data_std, dim_to_use):
     data_out = {}
     for key in data_set.keys():
-        #data_out[key] = np.divide((data_set[key]-data_mean), data_std)
-        data_out[key] = data_set[key]
+        data_out[key] = np.divide((data_set[key]-data_mean), data_std)
         data_out[key] = data_out[key][:,dim_to_use]
     return data_out
 
@@ -101,57 +100,6 @@ def train_sample(data_set, batch_size, source_seq_len, target_seq_len, input_siz
         decoder_inputs[i,:,:]  = data_sel[source_seq_len-1:source_seq_len,:]
         decoder_outputs[i,:,:] = data_sel[source_seq_len:,:]
 
-    # #visualize joints
-    # import matplotlib.pyplot as plt
-
-    # encoder_inputs_cartesian = self.encoder_inputs_exp2cart(encoder_inputs)
-    # for time_id in range(encoder_inputs_cartesian.shape[1]):
-    #     fig = plt.figure(figsize=(12, 12))
-    #     ax = fig.add_subplot(projection='3d')
-    #     neighbor_link_ = [(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(1,9),(5,9),
-    #                         (9,10),(10,11),(11,12),(12,13),(13,14),
-    #                         (11,15),(15,16),(16,17),(17,18),(18,19),(17,20),
-    #                         (12,21),(21,22),(22,23),(23,24),(24,25),(23,26)]
-    #     neighbor_link = [(i-1,j-1) for (i,j) in neighbor_link_]
-    #     encoder_inputs_sample_x_time_t = encoder_inputs_cartesian[4, time_id, :].reshape(-1, 3) # J, 3
-    #     #print(encoder_inputs_sample_x_time_t.shape)
-    #     #plot joints
-    #     ax.scatter(
-    #         encoder_inputs_sample_x_time_t[:, 0],
-    #         encoder_inputs_sample_x_time_t[:, 1],
-    #         encoder_inputs_sample_x_time_t[:, 2])
-    #     #plot bones
-    #     for bone in neighbor_link:
-    #         ax.plot(encoder_inputs_sample_x_time_t[bone, 0],
-    #             encoder_inputs_sample_x_time_t[bone, 1],
-    #             encoder_inputs_sample_x_time_t[bone, 2],
-    #             'ro-')
-    #     #label joints
-    #     for joint_index in range(encoder_inputs_sample_x_time_t.shape[0]):
-    #         ax.text(encoder_inputs_sample_x_time_t[joint_index, 0],
-    #             encoder_inputs_sample_x_time_t[joint_index, 1],
-    #             encoder_inputs_sample_x_time_t[joint_index, 2],
-    #             f"{joint_index}",
-    #             color="blue")
-    #     plt.savefig(f"skeletons/skeleton_<{time_id}>.png")
-    #     plt.close(fig)
-    # print(f"plotted {encoder_inputs.shape[1]} skeletons")
-    # while True:
-    #     continue
-    
-    #save joints
-    encoder_inputs_4d = encoder_inputs.reshape(
-        encoder_inputs.shape[0],
-        encoder_inputs.shape[1],
-        -1,
-        3
-    )
-    np.save(
-        "/home/eric/eece571f/DMGNN/cmu-short_no-diff_masked/visualize/encoder_inputs_26_joints_walking.npy",
-        encoder_inputs_4d)
-    print(f"encoder inputs saved, shape: {encoder_inputs_4d.shape}")
-    while True:
-        continue
     return encoder_inputs, decoder_inputs, decoder_outputs
 
 
@@ -376,7 +324,7 @@ def revert_coordinate_space(channels, R0, T0):
 
 def fkl(angles, parent, offset, posInd, expmapInd):
     # NOTE by Eric: this might be the code to do forward kinematics
-    njoints   = 26
+    njoints   = 38
     xyzStruct = [dict() for x in range(njoints)]
 
     for i in np.arange( njoints ):
