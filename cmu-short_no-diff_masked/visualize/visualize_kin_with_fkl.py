@@ -1,7 +1,4 @@
 # script to visualize skeletal sequences
-# usage:
-# python visualize_kin_with_fkl.py --npy_path <path to .npy file containing skeletal poses>
-#   --save_dir <directory to save skeletal images>
 
 from processor.data_tools import _some_variables, fkl
 import numpy as np
