@@ -20,8 +20,18 @@ class Model(nn.Module):
         self.linear = nn.Linear(n_hid_enc, n_hid_dec)
         self.relu = nn.ReLU()
 
+    def reparameterization(self, mean, var):
+        epsilon = torch.randn_like(var)#.to(DEVICE)        # sampling epsilon        
+        z = mean + var*epsilon                          # reparameterization trick
+        return z
+
     def forward(self, enc_p, enc_v, enc_a, dec_curr, dec_prev, dec_prev2,
-                t, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p=1):
+                t, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p=1): #t = target sequence length
+
+        mean, log_var = self.encoder_pos(enc_p, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p)
+        latent_var = self.reparameterization(mean, torch.exp(0.5 * log_var))		
+        preds = self.decoder(dec_curr, dec_prev, dec_prev2, latent_var, t)
+        return preds, mean, log_var 
         hidd_p = self.encoder_pos(enc_p, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p)
         #hidd_v = self.encoder_vel(enc_v, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p)
         #hidd_a = self.encoder_acl(enc_a, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p)
@@ -34,7 +44,7 @@ class Model(nn.Module):
 
 class Encoder(nn.Module):
 
-    def __init__(self, n_in_enc, graph_args_j, graph_args_p, graph_args_b, edge_weighting, fusion_layer, cross_w, **kwargs):
+    def __init__(self, n_in_enc, graph_args_j, graph_args_p, graph_args_b, edge_weighting, fusion_layer, cross_w, hidden_dim=256, **kwargs):
         super().__init__()
 
         self.graph_j = Graph_J(**graph_args_j)
@@ -105,6 +115,10 @@ class Encoder(nn.Module):
             self.eadd_s2 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_p.size())) for i in range(4)])
             self.emul_s3 = [1]*4
             self.eadd_s3 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_b.size())) for i in range(4)])
+
+        self.FC_mean  = nn.Linear(hidden_dim, hidden_dim)
+        self.FC_var   = nn.Linear(hidden_dim, hidden_dim)
+        self.hidden = nn.ReLU()
 
     def fuse_operation(self, x1, x2, x3, w):
         x = x1 + w * (x2+x3)
@@ -199,9 +213,16 @@ class Encoder(nn.Module):
         x_s21 = self.s2_back(x_s2_4)
         x_s31 = self.s3_back(x_s3_4)
         x_s1_5 = x_s1_4+lamda_p*x_s21+lamda_p*x_s31
-        x_out = torch.mean(self.s1_l5(x_s1_5, self.A_j*self.emul_s1[4]+self.eadd_s1[4]), dim=2)
+        x_hidden = torch.mean(self.s1_l5(x_s1_5, self.A_j*self.emul_s1[4]+self.eadd_s1[4]), dim=2)
+        x_out = self.hidden(x_hidden)
+		
+        x_out = x_out.permute(0, 2, 1)
+        x_mean = self.FC_mean(x_out)
+        x_log_var = self.FC_var(x_out) 
 
-        return x_out
+        x_mean = x_mean.permute(0, 2, 1)
+        x_log_var = x_log_var.permute(0, 2, 1) 
+        return x_mean, x_log_var
 
 
 class Decoder(nn.Module):
