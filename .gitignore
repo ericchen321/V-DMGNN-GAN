@@ -130,3 +130,9 @@ dmypy.json
 
 # the entire training/testing workspace
 work_dir/
+
+# amass dataset
+amass/ACCAD/
+amass/SFU/
+data/accad/train/
+data/accad/test/
