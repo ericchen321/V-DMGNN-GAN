@@ -29,9 +29,15 @@ class Model(nn.Module):
                 t, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p=1): #t = target sequence length
 
         mean, log_var = self.encoder_pos(enc_p, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p)
-        latent_var = self.reparameterization(mean, torch.exp(0.5 * log_var))		
-        preds = self.decoder(dec_curr, dec_prev, dec_prev2, latent_var, t)
-        return preds, mean, log_var 
+        latent_var = self.reparameterization(mean, torch.exp(0.5 * log_var))
+
+        hidden = self.linear(latent_var.permute(0, 2, 1)).permute(0, 2, 1)
+        hidden = self.relu(hidden)
+
+        preds = self.decoder(dec_curr, dec_prev, dec_prev2, hidden, t)
+        return preds, mean, log_var
+
+        '''
         hidd_p = self.encoder_pos(enc_p, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p)
         #hidd_v = self.encoder_vel(enc_v, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p)
         #hidd_a = self.encoder_acl(enc_a, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p)
@@ -40,7 +46,7 @@ class Model(nn.Module):
         hidden = self.relu(hidden)
         pred = self.decoder(dec_curr, dec_prev, dec_prev2, hidden, t)
         return pred
-        
+        '''
 
 class Encoder(nn.Module):
 
@@ -214,14 +220,15 @@ class Encoder(nn.Module):
         x_s31 = self.s3_back(x_s3_4)
         x_s1_5 = x_s1_4+lamda_p*x_s21+lamda_p*x_s31
         x_hidden = torch.mean(self.s1_l5(x_s1_5, self.A_j*self.emul_s1[4]+self.eadd_s1[4]), dim=2)
-        x_out = self.hidden(x_hidden)
+        # x_out = self.hidden(x_hidden)
+        x_out = x_hidden
 		
         x_out = x_out.permute(0, 2, 1)
         x_mean = self.FC_mean(x_out)
         x_log_var = self.FC_var(x_out) 
 
         x_mean = x_mean.permute(0, 2, 1)
-        x_log_var = x_log_var.permute(0, 2, 1) 
+        x_log_var = x_log_var.permute(0, 2, 1)
         return x_mean, x_log_var
 
 
@@ -319,9 +326,9 @@ class Decoder(nn.Module):
                 ins_a = ins_p-pred_all[step-2]-ins_v # ins_v-(pred_all[step-2]-pred_all[step-3])
                 ins_v_dec = pred_all[step-1]-pred_all[step-2]
             n = torch.randn(ins_p.size()).cuda()*0.0005
-            #ins = torch.cat((ins_p+n, ins_v, ins_a), dim=-1)
+            ins = torch.cat((ins_p+n, ins_v, ins_a), dim=-1)
             # NOTE: remove velocity and acceleration
-            ins = ins_p+n
+            # ins = ins_p+n
             pred_, hidden, res_ = self.step_forward(ins, hidden, step)
             pred_all.append(pred_)                                                 # [t, 64, 21, 3]
             res_all.append(res_)
