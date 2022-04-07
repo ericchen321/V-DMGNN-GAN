@@ -21,6 +21,9 @@ Run
 cd torchlight, python setup.py install, cd ..
 ```
 
+# AMASS Dataset
+AMASS dataset for DMGNN can be found [here](https://drive.google.com/drive/folders/1-nxLNkjskeNDZ9_XorK4kxls3xcPoyer?usp=sharing). Download the files and place them in the corresponding directories. 
+
 # Training and Testing
 
 To train a model for a specific task, e.g. short-term prediction on CMU Mocap, first
