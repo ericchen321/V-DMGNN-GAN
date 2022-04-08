@@ -2,6 +2,9 @@ train_dir: '../data/accad/train/'
 test_dir: '../data/accad/test/'
 work_dir: './work_dir/prediction'
 
+#train_dir: 'D:/Documents/DMGNN-master-Copy/data/accad/train/'
+#test_dir: 'D:/Documents/DMGNN-master-Copy/data/accad/test/'
+
 actions: 'all'
 batch_size: 32
 source_seq_len: 50
