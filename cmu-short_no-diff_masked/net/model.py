@@ -48,6 +48,17 @@ class Model(nn.Module):
         return pred
         '''
 
+
+    def generate_from_decoder(self, z, \
+                              dec_curr, dec_prev, dec_prev2,t):
+        # z_o = self.vae_linear_o(z).permute(0,2,1)
+        # z_o_h = self.relu(z_o) # z_o_h
+        hidden = self.linear(z.permute(0, 2, 1)).permute(0, 2, 1)
+        hidden = self.relu(hidden)
+
+        pred = self.decoder(dec_curr, dec_prev, dec_prev2, hidden, t)
+        return pred
+
 class Encoder(nn.Module):
 
     def __init__(self, n_in_enc, graph_args_j, graph_args_p, graph_args_b, edge_weighting, fusion_layer, cross_w, hidden_dim=256, **kwargs):
@@ -231,6 +242,67 @@ class Encoder(nn.Module):
         x_log_var = x_log_var.permute(0, 2, 1)
         return x_mean, x_log_var
 
+    # def forward_disc(self, x, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p):
+    #     N, T, D = x.size()  # N = 64(batch-size), T = 49, D = 66
+    #     V = self.A_j.size()[1]  # V = 21
+    #     x = x.contiguous().view(N, T, V, -1)  # [N, T, V, d] = [64, 49, 21, 3]
+    #     x = x.permute(0, 3, 1, 2).contiguous()  # [N, d, T, V] = [64, 3, 49, 21]
+    #
+    #     x_s1_0, x_s2_0, x_s3_0 = x, self.s2_init(x), self.s3_init(x)
+    #
+    #
+    #     if self.fusion_layer == 2:
+    #         x_s1_1 = self.s1_l1(x_s1_0, self.A_j * self.emul_s1[0] + self.eadd_s1[0])
+    #         x_s2_1 = self.s2_l1(x_s2_0, self.A_p * self.emul_s2[0] + self.eadd_s2[0])
+    #         x_s3_1 = self.s3_l1(x_s3_0, self.A_b * self.emul_s3[0] + self.eadd_s3[0])
+    #
+    #         c12_1 = self.j2p_1(x_s1_1, x_s2_1, relrec_s1, relsend_s1, relrec_s2, relsend_s2)
+    #         r12_1 = self.p2j_1(x_s2_1, x_s1_1, relrec_s2, relsend_s2, relrec_s1, relsend_s1)
+    #         c23_1 = self.p2b_1(x_s2_1, x_s3_1, relrec_s2, relsend_s2, relrec_s3, relsend_s3)
+    #         r23_1 = self.b2p_1(x_s3_1, x_s2_1, relrec_s3, relsend_s3, relrec_s2, relsend_s2)
+    #         x_s1_1 = self.fuse_operation(x_s1_1, r12_1, 0, self.cross_w)
+    #         x_s2_1 = self.fuse_operation(x_s2_1, c12_1, r23_1, self.cross_w)
+    #         x_s3_1 = self.fuse_operation(x_s3_1, c23_1, 0, self.cross_w)
+    #
+    #         x_s1_2 = self.s1_l2(x_s1_1, self.A_j * self.emul_s1[1] + self.eadd_s1[1])
+    #         x_s2_2 = self.s2_l2(x_s2_1, self.A_p * self.emul_s2[1] + self.eadd_s2[1])
+    #         x_s3_2 = self.s3_l2(x_s3_1, self.A_b * self.emul_s3[1] + self.eadd_s3[1])
+    #
+    #         c12_2 = self.j2p_2(x_s1_2, x_s2_2, relrec_s1, relsend_s1, relrec_s2, relsend_s2)
+    #         r12_2 = self.p2j_2(x_s2_2, x_s1_2, relrec_s2, relsend_s2, relrec_s1, relsend_s1)
+    #         c23_2 = self.p2b_2(x_s2_2, x_s3_2, relrec_s2, relsend_s2, relrec_s3, relsend_s3)
+    #         r23_2 = self.b2p_2(x_s3_2, x_s2_2, relrec_s3, relsend_s3, relrec_s2, relsend_s2)
+    #         x_s1_2 = self.fuse_operation(x_s1_2, r12_2, 0, self.cross_w)
+    #         x_s2_2 = self.fuse_operation(x_s2_2, c12_2, r23_2, self.cross_w)
+    #         x_s3_2 = self.fuse_operation(x_s3_2, c23_2, 0, self.cross_w)
+    #
+    #         x_s1_3 = self.s1_l3(x_s1_2, self.A_j * self.emul_s1[2] + self.eadd_s1[2])
+    #         x_s2_3 = self.s2_l3(x_s2_2, self.A_p * self.emul_s2[2] + self.eadd_s2[2])
+    #         x_s3_3 = self.s3_l3(x_s3_2, self.A_b * self.emul_s3[2] + self.eadd_s3[2])
+    #
+    #         x_s1_4 = self.s1_l4(x_s1_3, self.A_j * self.emul_s1[3] + self.eadd_s1[3])
+    #         x_s2_4 = self.s2_l4(x_s2_3, self.A_p * self.emul_s2[3] + self.eadd_s2[3])
+    #         x_s3_4 = self.s3_l4(x_s3_3, self.A_b * self.emul_s3[3] + self.eadd_s3[3])
+    #
+    #     else:
+    #         raise ValueError('No Such Fusion Architecture')
+    #
+    #     x_s21 = self.s2_back(x_s2_4)
+    #     x_s31 = self.s3_back(x_s3_4)
+    #     x_s1_5 = x_s1_4 + lamda_p * x_s21 + lamda_p * x_s31
+    #     x_hidden = torch.mean(self.s1_l5(x_s1_5, self.A_j * self.emul_s1[4] + self.eadd_s1[4]), dim=2)
+    #     # x_out = self.hidden(x_hidden)
+    #     x_out = x_hidden
+    #
+    #     x_out = x_out.permute(0, 2, 1)
+    #     x_mean = self.FC_mean(x_out)
+    #     x_log_var = self.FC_var(x_out)
+    #
+    #     x_mean = x_mean.permute(0, 2, 1)
+    #     x_log_var = x_log_var.permute(0, 2, 1)
+    #     return x_mean, x_log_var
+
+
 
 class Decoder(nn.Module):
    
@@ -338,3 +410,339 @@ class Decoder(nn.Module):
         preds = preds * self.mask
        
         return preds.transpose(1, 2).contiguous()      # [64, 21, t, 3]
+
+
+
+
+class Discriminator(nn.Module):
+
+    def __init__(self, n_in_enc, graph_args_j, graph_args_p, graph_args_b, edge_weighting, fusion_layer, cross_w,
+                 **kwargs):
+        super().__init__()
+
+        self.graph_j = Graph_J(**graph_args_j)
+        self.graph_p = Graph_P(**graph_args_p)
+        self.graph_b = Graph_B(**graph_args_b)
+        A_j = torch.tensor(self.graph_j.A_j, dtype=torch.float32, requires_grad=False)
+        self.register_buffer('A_j', A_j)
+        A_p = torch.tensor(self.graph_p.A_p, dtype=torch.float32, requires_grad=False)
+        self.register_buffer('A_p', A_p)
+        A_b = torch.tensor(self.graph_b.A_b, dtype=torch.float32, requires_grad=False)
+        self.register_buffer('A_b', A_b)
+
+        t_ksize, s_ksize_1, s_ksize_2, s_ksize_3 = 5, self.A_j.size(0), self.A_p.size(0), self.A_b.size(0)
+        ksize_1 = (t_ksize, s_ksize_1)
+        # ksize_2 = (t_ksize, s_ksize_2)
+        # ksize_3 = (t_ksize, s_ksize_3)
+
+        self.s2_init = AveargeJoint()
+        self.s3_init = AveargePart()
+        self.s1_l1 = St_gcn(n_in_enc, 32, ksize_1, stride=1, residual=False, **kwargs)
+        self.s1_l2 = St_gcn(32, 64, ksize_1, stride=2, **kwargs)
+        self.s1_l3 = St_gcn(64, 128, ksize_1, stride=2, **kwargs)
+        self.s1_l4 = St_gcn(128, 256, ksize_1, stride=2, **kwargs)
+        self.s1_l5 = St_gcn(256, 256, ksize_1, stride=1, **kwargs)
+        # use 1-level feature extractor for DiscriminatorTBD
+
+        # self.s2_l1 = St_gcn(n_in_enc, 32, ksize_2, stride=1, residual=False, **kwargs)
+        # self.s2_l2 = St_gcn(32, 64, ksize_2, stride=2, **kwargs)
+        # self.s2_l3 = St_gcn(64, 128, ksize_2, stride=2, **kwargs)
+        # self.s2_l4 = St_gcn(128, 256, ksize_2, stride=2, **kwargs)
+        # self.s3_l1 = St_gcn(n_in_enc, 32, ksize_3, stride=1, residual=False, **kwargs)
+        # self.s3_l2 = St_gcn(32, 64, ksize_3, stride=2, **kwargs)
+        # self.s3_l3 = St_gcn(64, 128, ksize_3, stride=2, **kwargs)
+        # self.s3_l3 = St_gcn(64, 128, ksize_3, stride=2, **kwargs)
+        # self.s3_l4 = St_gcn(128, 256, ksize_3, stride=2, **kwargs)
+        self.s2_back = PartLocalInform()
+        self.s3_back = BodyLocalInform()
+        self.fusion_layer = fusion_layer
+        self.cross_w = cross_w
+
+        if edge_weighting:
+            self.emul_s1 = nn.ParameterList([nn.Parameter(torch.ones(self.A_j.size())) for i in range(5)])
+            self.eadd_s1 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_j.size())) for i in range(5)])
+            self.emul_s2 = nn.ParameterList([nn.Parameter(torch.ones(self.A_p.size())) for i in range(4)])
+            self.eadd_s2 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_p.size())) for i in range(4)])
+            self.emul_s3 = nn.ParameterList([nn.Parameter(torch.ones(self.A_b.size())) for i in range(4)])
+            self.eadd_s3 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_b.size())) for i in range(4)])
+        else:
+            self.emul_s1 = [1] * 0
+            self.eadd_s1 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_j.size())) for i in range(5)])
+            self.emul_s2 = [1] * 4
+            self.eadd_s2 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_p.size())) for i in range(4)])
+            self.emul_s3 = [1] * 4
+            self.eadd_s3 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_b.size())) for i in range(4)])
+
+        self.post_layer = nn.Sequential(
+            nn.Linear(26, 1),
+            # nn.Sigmoid()
+        )
+        self.fcn = nn.Conv2d(256,1, kernel_size=1)
+        # self.fcn2 = nn.linear(26, 1)
+        # self.sigmoid =
+        # linear layer
+
+    def fuse_operation(self, x1, x2, x3, w):
+        x = x1 + w * (x2 + x3)
+        return x
+
+    def forward(self, x):
+        N, T, D = x.size()  # N = 64(batch-size), T = 49, D = 66
+        V = self.A_j.size()[1]  # V = 21
+        x = x.contiguous().view(N, T, V, -1)  # [N, T, V, d] = [64, 49, 21, 3]
+        x = x.permute(0, 3, 1, 2).contiguous()  # [N, d, T, V] = [64, 3, 49, 21]
+
+        x_s1_0, x_s2_0, x_s3_0 = x, self.s2_init(x), self.s3_init(x)
+
+        if self.fusion_layer == 0:
+            x_s1_1 = self.s1_l1(x_s1_0, self.A_j * self.emul_s1[0] + self.eadd_s1[0])
+            # x_s2_1 = self.s2_l1(x_s2_0, self.A_p * self.emul_s2[0] + self.eadd_s2[0])
+            # x_s3_1 = self.s3_l1(x_s3_0, self.A_b * self.emul_s3[0] + self.eadd_s3[0])
+
+            x_s1_2 = self.s1_l2(x_s1_1, self.A_j * self.emul_s1[1] + self.eadd_s1[1])
+            # x_s2_2 = self.s2_l2(x_s2_1, self.A_p * self.emul_s2[1] + self.eadd_s2[1])
+            # x_s3_2 = self.s3_l2(x_s3_1, self.A_b * self.emul_s3[1] + self.eadd_s3[1])
+
+            x_s1_3 = self.s1_l3(x_s1_2, self.A_j * self.emul_s1[2] + self.eadd_s1[2])
+            # x_s2_3 = self.s2_l3(x_s2_2, self.A_p * self.emul_s2[2] + self.eadd_s2[2])
+            # x_s3_3 = self.s3_l3(x_s3_2, self.A_b * self.emul_s3[2] + self.eadd_s3[2])
+
+            x_s1_4 = self.s1_l4(x_s1_3, self.A_j * self.emul_s1[3] + self.eadd_s1[3])
+            # x_s2_4 = self.s2_l4(x_s2_3, self.A_p * self.emul_s2[3] + self.eadd_s2[3])
+            # x_s3_4 = self.s3_l4(x_s3_3, self.A_b * self.emul_s3[3] + self.eadd_s3[3])
+
+
+        # x_s21 = self.s2_back(x_s2_4)
+        # x_s31 = self.s3_back(x_s3_4)
+        # x_s1_5 = x_s1_4 + lamda_p * x_s21 + lamda_p * x_s31
+        x_s1_5 = x_s1_4
+        # x_out = torch.mean(self.s1_l5(x_s1_5, self.A_j * self.emul_s1[4] + self.eadd_s1[4]), dim=2)
+        x_out = self.s1_l5(x_s1_5, self.A_j * self.emul_s1[4] + self.eadd_s1[4])
+        _,c,t,v = x_out.size()
+        # feature = x_out.view(N, 1, c, t, v).permute(0, 2, 3, 4, 1)
+
+        # prediction
+        x_out = self.fcn(x_out)
+        output = x_out.view(N, 1, -1, t, v).permute(0, 2, 3, 4, 1)
+
+        output = torch.mean(output, dim=2) #TBD ############# bad use spectralnorm or use leakyReLU
+        output = output.view(N,-1)
+        output = self.post_layer(output)
+        return output
+
+
+class Discriminatorv2(nn.Module):
+
+    def __init__(self, n_in_enc, graph_args_j, graph_args_p, graph_args_b, edge_weighting, fusion_layer, cross_w,
+                 hidden_dim=256, **kwargs):
+        super().__init__()
+
+        self.graph_j = Graph_J(**graph_args_j)
+        self.graph_p = Graph_P(**graph_args_p)
+        self.graph_b = Graph_B(**graph_args_b)
+        A_j = torch.tensor(self.graph_j.A_j, dtype=torch.float32, requires_grad=False)
+        self.register_buffer('A_j', A_j)
+        A_p = torch.tensor(self.graph_p.A_p, dtype=torch.float32, requires_grad=False)
+        self.register_buffer('A_p', A_p)
+        A_b = torch.tensor(self.graph_b.A_b, dtype=torch.float32, requires_grad=False)
+        self.register_buffer('A_b', A_b)
+
+        t_ksize, s_ksize_1, s_ksize_2, s_ksize_3 = 5, self.A_j.size(0), self.A_p.size(0), self.A_b.size(0)
+        ksize_1 = (t_ksize, s_ksize_1)
+        ksize_2 = (t_ksize, s_ksize_2)
+        ksize_3 = (t_ksize, s_ksize_3)
+
+        self.s2_init = AveargeJoint()
+        self.s3_init = AveargePart()
+        self.s1_l1 = St_gcn(n_in_enc, 32, ksize_1, stride=1, residual=False, **kwargs)
+        self.s1_l2 = St_gcn(32, 64, ksize_1, stride=2, **kwargs)
+        self.s1_l3 = St_gcn(64, 128, ksize_1, stride=2, **kwargs)
+        self.s1_l4 = St_gcn(128, 256, ksize_1, stride=2, **kwargs)
+        self.s1_l5 = St_gcn(256, 256, ksize_1, stride=1, **kwargs)
+        self.s2_l1 = St_gcn(n_in_enc, 32, ksize_2, stride=1, residual=False, **kwargs)
+        self.s2_l2 = St_gcn(32, 64, ksize_2, stride=2, **kwargs)
+        self.s2_l3 = St_gcn(64, 128, ksize_2, stride=2, **kwargs)
+        self.s2_l4 = St_gcn(128, 256, ksize_2, stride=2, **kwargs)
+        self.s3_l1 = St_gcn(n_in_enc, 32, ksize_3, stride=1, residual=False, **kwargs)
+        self.s3_l2 = St_gcn(32, 64, ksize_3, stride=2, **kwargs)
+        self.s3_l3 = St_gcn(64, 128, ksize_3, stride=2, **kwargs)
+        self.s3_l4 = St_gcn(128, 256, ksize_3, stride=2, **kwargs)
+        self.s2_back = PartLocalInform()
+        self.s3_back = BodyLocalInform()
+        self.fusion_layer = fusion_layer
+        self.cross_w = cross_w
+
+        if self.fusion_layer == 0:
+            pass
+        elif self.fusion_layer == 1:
+            self.j2p_1 = S1_to_S2(n_j1=32, n_j2=(800, 256), n_p1=32, n_p2=(800, 256), t_kernel=5, t_stride=(1, 2),
+                                  t_padding=2)
+            self.p2j_1 = S2_to_S1(n_p1=32, n_p2=(800, 256), n_j1=32, n_j2=(800, 256), t_kernel=5, t_stride=(1, 2),
+                                  t_padding=2)
+            self.p2b_1 = S2_to_S3(n_p1=32, n_p2=(800, 256), n_b1=32, n_b2=(800, 256), t_kernel=5, t_stride=(1, 2),
+                                  t_padding=2)
+            self.b2p_1 = S3_to_S2(n_b1=32, n_b2=(800, 256), n_p1=32, n_p2=(800, 256), t_kernel=5, t_stride=(1, 2),
+                                  t_padding=2)
+        elif self.fusion_layer == 2:
+            self.j2p_1 = S1_to_S2(n_j1=32, n_j2=(800, 256), n_p1=32, n_p2=(800, 256), t_kernel=5, t_stride=(1, 2),
+                                  t_padding=2)
+            self.p2j_1 = S2_to_S1(n_p1=32, n_p2=(800, 256), n_j1=32, n_j2=(800, 256), t_kernel=5, t_stride=(1, 2),
+                                  t_padding=2)
+            self.p2b_1 = S2_to_S3(n_p1=32, n_p2=(800, 256), n_b1=32, n_b2=(800, 256), t_kernel=5, t_stride=(1, 2),
+                                  t_padding=2)
+            self.b2p_1 = S3_to_S2(n_b1=32, n_b2=(800, 256), n_p1=32, n_p2=(800, 256), t_kernel=5, t_stride=(1, 2),
+                                  t_padding=2)
+            self.j2p_2 = S1_to_S2(n_j1=64, n_j2=(832, 256), n_p1=64, n_p2=(832, 256), t_kernel=5, t_stride=(1, 2),
+                                  t_padding=2)
+            self.p2j_2 = S2_to_S1(n_p1=64, n_p2=(832, 256), n_j1=64, n_j2=(832, 256), t_kernel=5, t_stride=(1, 2),
+                                  t_padding=2)
+            self.p2b_2 = S2_to_S3(n_p1=64, n_p2=(832, 256), n_b1=64, n_b2=(832, 256), t_kernel=5, t_stride=(1, 2),
+                                  t_padding=2)
+            self.b2p_2 = S3_to_S2(n_b1=64, n_b2=(832, 256), n_p1=64, n_p2=(832, 256), t_kernel=5, t_stride=(1, 2),
+                                  t_padding=2)
+        else:
+            raise ValueError('No Such Fusion Architecture')
+
+        if edge_weighting:
+            self.emul_s1 = nn.ParameterList([nn.Parameter(torch.ones(self.A_j.size())) for i in range(5)])
+            self.eadd_s1 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_j.size())) for i in range(5)])
+            self.emul_s2 = nn.ParameterList([nn.Parameter(torch.ones(self.A_p.size())) for i in range(4)])
+            self.eadd_s2 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_p.size())) for i in range(4)])
+            self.emul_s3 = nn.ParameterList([nn.Parameter(torch.ones(self.A_b.size())) for i in range(4)])
+            self.eadd_s3 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_b.size())) for i in range(4)])
+        else:
+            self.emul_s1 = [1] * 0
+            self.eadd_s1 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_j.size())) for i in range(5)])
+            self.emul_s2 = [1] * 4
+            self.eadd_s2 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_p.size())) for i in range(4)])
+            self.emul_s3 = [1] * 4
+            self.eadd_s3 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_b.size())) for i in range(4)])
+
+        # self.FC_mean = nn.Linear(hidden_dim, hidden_dim)
+        # self.FC_var = nn.Linear(hidden_dim, hidden_dim)
+        # self.hidden = nn.ReLU()
+        self.post_layer = nn.Sequential(
+            nn.Linear(26, 1),
+            # nn.Sigmoid()
+        )
+        self.fcn = nn.Conv2d(256,1, kernel_size=1)
+
+    def fuse_operation(self, x1, x2, x3, w):
+        x = x1 + w * (x2 + x3)
+        return x
+
+    def forward(self, x, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p):
+        N, T, D = x.size()  # N = 64(batch-size), T = 49, D = 66
+        V = self.A_j.size()[1]  # V = 21
+        x = x.contiguous().view(N, T, V, -1)  # [N, T, V, d] = [64, 49, 21, 3]
+        x = x.permute(0, 3, 1, 2).contiguous()  # [N, d, T, V] = [64, 3, 49, 21]
+
+        x_s1_0, x_s2_0, x_s3_0 = x, self.s2_init(x), self.s3_init(x)
+
+        if self.fusion_layer == 0:
+            x_s1_1 = self.s1_l1(x_s1_0, self.A_j * self.emul_s1[0] + self.eadd_s1[0])
+            x_s2_1 = self.s2_l1(x_s2_0, self.A_p * self.emul_s2[0] + self.eadd_s2[0])
+            x_s3_1 = self.s3_l1(x_s3_0, self.A_b * self.emul_s3[0] + self.eadd_s3[0])
+
+            x_s1_2 = self.s1_l2(x_s1_1, self.A_j * self.emul_s1[1] + self.eadd_s1[1])
+            x_s2_2 = self.s2_l2(x_s2_1, self.A_p * self.emul_s2[1] + self.eadd_s2[1])
+            x_s3_2 = self.s3_l2(x_s3_1, self.A_b * self.emul_s3[1] + self.eadd_s3[1])
+
+            x_s1_3 = self.s1_l3(x_s1_2, self.A_j * self.emul_s1[2] + self.eadd_s1[2])
+            x_s2_3 = self.s2_l3(x_s2_2, self.A_p * self.emul_s2[2] + self.eadd_s2[2])
+            x_s3_3 = self.s3_l3(x_s3_2, self.A_b * self.emul_s3[2] + self.eadd_s3[2])
+
+            x_s1_4 = self.s1_l4(x_s1_3, self.A_j * self.emul_s1[3] + self.eadd_s1[3])
+            x_s2_4 = self.s2_l4(x_s2_3, self.A_p * self.emul_s2[3] + self.eadd_s2[3])
+            x_s3_4 = self.s3_l4(x_s3_3, self.A_b * self.emul_s3[3] + self.eadd_s3[3])
+
+        elif self.fusion_layer == 1:
+            x_s1_1 = self.s1_l1(x_s1_0, self.A_j * self.emul_s1[0] + self.eadd_s1[0])
+            x_s2_1 = self.s2_l1(x_s2_0, self.A_p * self.emul_s2[0] + self.eadd_s2[0])
+            x_s3_1 = self.s3_l1(x_s3_0, self.A_b * self.emul_s3[0] + self.eadd_s3[0])
+
+            c12_1 = self.j2p_1(x_s1_1, x_s2_1, relrec_s1, relsend_s1, relrec_s2, relsend_s2)
+            r12_1 = self.p2j_1(x_s2_1, x_s1_1, relrec_s2, relsend_s2, relrec_s1, relsend_s1)
+            c23_1 = self.p2b_1(x_s2_1, x_s3_1, relrec_s2, relsend_s2, relrec_s3, relsend_s3)
+            r23_1 = self.b2p_1(x_s3_1, x_s2_1, relrec_s3, relsend_s3, relrec_s2, relsend_s2)
+            x_s1_1 = self.fuse_operation(x_s1_1, r12_1, 0, self.cross_w)
+            x_s2_1 = self.fuse_operation(x_s2_1, c12_1, r23_1, self.cross_w)
+            x_s3_1 = self.fuse_operation(x_s3_1, c23_1, 0, self.cross_w)
+
+            x_s1_2 = self.s1_l2(x_s1_1, self.A_j * self.emul_s1[1] + self.eadd_s1[1])
+            x_s2_2 = self.s2_l2(x_s2_1, self.A_p * self.emul_s2[1] + self.eadd_s2[1])
+            x_s3_2 = self.s3_l2(x_s3_1, self.A_b * self.emul_s3[1] + self.eadd_s3[1])
+
+            x_s1_3 = self.s1_l3(x_s1_2, self.A_j * self.emul_s1[2] + self.eadd_s1[2])
+            x_s2_3 = self.s2_l3(x_s2_2, self.A_p * self.emul_s2[2] + self.eadd_s2[2])
+            x_s3_3 = self.s3_l3(x_s3_2, self.A_b * self.emul_s3[2] + self.eadd_s3[2])
+
+            x_s1_4 = self.s1_l4(x_s1_3, self.A_j * self.emul_s1[3] + self.eadd_s1[3])
+            x_s2_4 = self.s2_l4(x_s2_3, self.A_p * self.emul_s2[3] + self.eadd_s2[3])
+            x_s3_4 = self.s3_l4(x_s3_3, self.A_b * self.emul_s3[3] + self.eadd_s3[3])
+
+        elif self.fusion_layer == 2:
+            x_s1_1 = self.s1_l1(x_s1_0, self.A_j * self.emul_s1[0] + self.eadd_s1[0])
+            x_s2_1 = self.s2_l1(x_s2_0, self.A_p * self.emul_s2[0] + self.eadd_s2[0])
+            x_s3_1 = self.s3_l1(x_s3_0, self.A_b * self.emul_s3[0] + self.eadd_s3[0])
+
+            c12_1 = self.j2p_1(x_s1_1, x_s2_1, relrec_s1, relsend_s1, relrec_s2, relsend_s2)
+            r12_1 = self.p2j_1(x_s2_1, x_s1_1, relrec_s2, relsend_s2, relrec_s1, relsend_s1)
+            c23_1 = self.p2b_1(x_s2_1, x_s3_1, relrec_s2, relsend_s2, relrec_s3, relsend_s3)
+            r23_1 = self.b2p_1(x_s3_1, x_s2_1, relrec_s3, relsend_s3, relrec_s2, relsend_s2)
+            x_s1_1 = self.fuse_operation(x_s1_1, r12_1, 0, self.cross_w)
+            x_s2_1 = self.fuse_operation(x_s2_1, c12_1, r23_1, self.cross_w)
+            x_s3_1 = self.fuse_operation(x_s3_1, c23_1, 0, self.cross_w)
+
+            x_s1_2 = self.s1_l2(x_s1_1, self.A_j * self.emul_s1[1] + self.eadd_s1[1])
+            x_s2_2 = self.s2_l2(x_s2_1, self.A_p * self.emul_s2[1] + self.eadd_s2[1])
+            x_s3_2 = self.s3_l2(x_s3_1, self.A_b * self.emul_s3[1] + self.eadd_s3[1])
+
+            c12_2 = self.j2p_2(x_s1_2, x_s2_2, relrec_s1, relsend_s1, relrec_s2, relsend_s2)
+            r12_2 = self.p2j_2(x_s2_2, x_s1_2, relrec_s2, relsend_s2, relrec_s1, relsend_s1)
+            c23_2 = self.p2b_2(x_s2_2, x_s3_2, relrec_s2, relsend_s2, relrec_s3, relsend_s3)
+            r23_2 = self.b2p_2(x_s3_2, x_s2_2, relrec_s3, relsend_s3, relrec_s2, relsend_s2)
+            x_s1_2 = self.fuse_operation(x_s1_2, r12_2, 0, self.cross_w)
+            x_s2_2 = self.fuse_operation(x_s2_2, c12_2, r23_2, self.cross_w)
+            x_s3_2 = self.fuse_operation(x_s3_2, c23_2, 0, self.cross_w)
+
+            x_s1_3 = self.s1_l3(x_s1_2, self.A_j * self.emul_s1[2] + self.eadd_s1[2])
+            x_s2_3 = self.s2_l3(x_s2_2, self.A_p * self.emul_s2[2] + self.eadd_s2[2])
+            x_s3_3 = self.s3_l3(x_s3_2, self.A_b * self.emul_s3[2] + self.eadd_s3[2])
+
+            x_s1_4 = self.s1_l4(x_s1_3, self.A_j * self.emul_s1[3] + self.eadd_s1[3])
+            x_s2_4 = self.s2_l4(x_s2_3, self.A_p * self.emul_s2[3] + self.eadd_s2[3])
+            x_s3_4 = self.s3_l4(x_s3_3, self.A_b * self.emul_s3[3] + self.eadd_s3[3])
+
+        else:
+            raise ValueError('No Such Fusion Architecture')
+
+        x_s21 = self.s2_back(x_s2_4)
+        x_s31 = self.s3_back(x_s3_4)
+        x_s1_5 = x_s1_4 + lamda_p * x_s21 + lamda_p * x_s31
+        # x_hidden = torch.mean(self.s1_l5(x_s1_5, self.A_j * self.emul_s1[4] + self.eadd_s1[4]), dim=2)
+        x_hidden = self.s1_l5(x_s1_5, self.A_j * self.emul_s1[4] + self.eadd_s1[4])
+
+        # x_out = self.hidden(x_hidden)
+        x_out = x_hidden
+
+        _,c,t,v = x_out.size()
+        # feature = x_out.view(N, 1, c, t, v).permute(0, 2, 3, 4, 1)
+
+        # prediction
+        x_out = self.fcn(x_out)
+        output = x_out.view(N, 1, -1, t, v).permute(0, 2, 3, 4, 1)
+
+        output = torch.mean(output, dim=2) #TBD ############# bad use spectralnorm or use leakyReLU
+        output = output.view(N,-1)
+        output = self.post_layer(output)
+        return output
+        '''
+        x_out = x_out.permute(0, 2, 1)
+        x_mean = self.FC_mean(x_out)
+        x_log_var = self.FC_var(x_out)
+
+        x_mean = x_mean.permute(0, 2, 1)
+        x_log_var = x_log_var.permute(0, 2, 1)
+        return x_mean, x_log_var
+        '''

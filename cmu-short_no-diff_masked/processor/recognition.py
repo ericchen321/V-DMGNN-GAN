@@ -21,6 +21,11 @@ from torchlight import import_class
 from .processor import Processor
 from .data_tools import *
 
+from copy import deepcopy
+from torch.distributions.uniform import Uniform
+
+
+
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -50,7 +55,22 @@ class REC_Processor(Processor):
         self.relsend_part = torch.FloatTensor(np.array(encode_onehot(np.where(off_diag_part)[0]), dtype=np.float32)).to(self.dev)
         self.relrec_body = torch.FloatTensor(np.array(encode_onehot(np.where(off_diag_body)[1]), dtype=np.float32)).to(self.dev)
         self.relsend_body = torch.FloatTensor(np.array(encode_onehot(np.where(off_diag_body)[0]), dtype=np.float32)).to(self.dev)
-        self.lower_body_joints = [0, 1, 2, 3, 4, 5, 6, 7]
+        self.lower_body_joints = [1,2,3]#[0, 1, 2, 3, 4, 5, 6, 7]
+
+
+        self.dismodel_args = deepcopy(self.arg.model_args)
+        self.dismodel_args.pop('n_in_dec', None)
+        self.dismodel_args.pop('n_hid_dec', None)
+        self.dismodel_args.pop('n_hid_enc', None)
+        self.dismodel_args['edge_weighting'] =True
+        self.dismodel_args['fusion_layer'] = 0
+
+
+        self.discriminator = self.io.load_model('net.model.Discriminatorv2', **(self.dismodel_args))
+        self.discriminator.apply(weights_init)
+        self.discriminator.cuda()
+        self.criterion = nn.BCEWithLogitsLoss()# nn.BCELoss()
+        self.visual_sigmoid = nn.Sigmoid()
         
     def load_optimizer(self):
         if self.arg.optimizer == 'SGD':
@@ -62,6 +82,10 @@ class REC_Processor(Processor):
         elif self.arg.optimizer == 'Adam':
             self.optimizer = optim.Adam(params=self.model.parameters(),
                                         lr=self.arg.base_lr,
+                                        weight_decay=self.arg.weight_decay)
+
+        self.netD_optimizer =optim.Adam(params=self.discriminator.parameters(),
+                                        lr=0.00001,
                                         weight_decay=self.arg.weight_decay)
 
 
@@ -92,7 +116,7 @@ class REC_Processor(Processor):
         mean_val = mean_val.mean(-1).mean(1).mean(0)
         log_var = log_var.mean(-1).mean(1).mean(0)
         KLD = - 0.5 * torch.sum(1+ log_var - mean_val.pow(2) - log_var.exp())
-        return reconstruction_loss + 0.1*KLD    
+        return reconstruction_loss + 0.1*KLD
 
 
     def build_masking_matrix_add_noise(self, unmasked_matrix, joint_indices):
@@ -128,8 +152,95 @@ class REC_Processor(Processor):
         # build decoder output / target mask
         #M_dec_out = self.build_masking_matrix(targets, lower_body_joints)
         return M_enc_in, M_dec_in
-    
+
+
     def train(self):
+
+        if self.meta_info['iter'] % 2 == 0:
+            with torch.no_grad():
+                mean, var, gan_decoder_inputs, gan_targets,  gan_decoder_inputs_previous, \
+                    gan_decoder_inputs_previous2 = self.train_generator(mode='discriminator')
+
+            self.train_decoder(mean, var, gan_decoder_inputs, gan_targets, gan_decoder_inputs_previous, gan_decoder_inputs_previous2)
+        else:
+            self.train_generator(mode='generator')
+
+    def train_decoder(self, mean, var, gan_decoder_inputs, gan_targets, gan_decoder_inputs_previous, gan_decoder_inputs_previous2):
+        with torch.no_grad():
+            dec_mean = mean.clone()
+            dec_var = var.clone()
+            dec_var = torch.exp(0.5 * dec_var) # TBD
+            epsilon = torch.randn_like(dec_var)
+            z = dec_mean + dec_var * epsilon
+            dis_pred = self.model.generate_from_decoder(z, gan_decoder_inputs, gan_decoder_inputs_previous, \
+                                                        gan_decoder_inputs_previous2,self.arg.target_seq_len) #[32, 26, 10, 3]
+
+            dis_pred = dis_pred.detach()
+            dis_pred = dis_pred.requires_grad_()
+
+        dis_pred = dis_pred.permute(0, 2, 1, 3).contiguous().view(32, 10, -1)
+        dis_o = self.discriminator(dis_pred, self.relrec_joint,
+                                     self.relsend_joint,
+                                     self.relrec_part,
+                                     self.relsend_part,
+                                     self.relrec_body,
+                                     self.relsend_body,
+                                     self.arg.lamda)# .view(-1)
+
+        # dis_o = dis_o.detach()
+        # dis_o =dis_o.requires_grad_()
+
+
+
+        self.netD_optimizer.zero_grad()
+        N = dis_o.size()[0]
+        # label = torch.full((N,), 0.0, dtype=torch.float, device='cuda:0')
+        # label = Uniform(0.0, 0.1).sample((N,1)).cuda()
+        fake_labels = torch.FloatTensor(1).fill_(0.0)
+        fake_labels = fake_labels.requires_grad_(False)
+        fake_labels = fake_labels.expand_as(dis_o).cuda()
+        # print(fake_labels.size())
+        # print(dis_o.size())
+        errD_fake= self.criterion(dis_o, fake_labels)
+        # Calculate gradients for D in backward pass
+        # errD_fake.backward()
+        D_x_fake = dis_o.mean().item() # to display
+
+        # for the real
+        targets = gan_targets#.permute(0, 2, 1, 3).contiguous().view(32, 10, -1)
+
+        dis_oreal = self.discriminator(targets, self.relrec_joint,
+                                     self.relsend_joint,
+                                     self.relrec_part,
+                                     self.relsend_part,
+                                     self.relrec_body,
+                                     self.relsend_body,
+                                     self.arg.lamda)# .view(-1)
+        # real_labels = torch.full((N,), 1.0, dtype=torch.float, device='cuda:0')
+        # real_labels = Uniform(0.9, 1.0).sample((N,1)).cuda()
+        real_labels = torch.FloatTensor(1).fill_(1.0)
+        real_labels = real_labels.requires_grad_(False)
+        real_labels  = real_labels.expand_as(dis_oreal).cuda()
+        # print(real_labels.requires_grad)
+        errD_real= self.criterion(dis_oreal, real_labels)
+        # errD_real.backward()
+        errD = 0.5*(errD_real + errD_fake)
+        errD.backward()
+        self.netD_optimizer.step()
+        D_x_real = dis_oreal.mean().item()
+
+
+
+        self.iter_info['discriminator loss'] = errD
+        self.iter_info['discriminator real out'] = D_x_real
+        self.iter_info['discriminator fake out'] = D_x_fake
+        self.iter_info['discriminator real loss'] = errD_real
+        self.iter_info['discriminator fake loss'] = errD_fake
+
+        self.show_iter_info()
+        self.meta_info['iter'] += 1
+
+    def train_generator(self, mode='generator'):
         self.model.train()
         self.adjust_lr()
         loss_value = []
@@ -169,13 +280,18 @@ class REC_Processor(Processor):
         encoder_inputs_a = torch.Tensor(encoder_inputs_a).float().to(self.dev)
 
         decoder_inputs = torch.Tensor(decoder_inputs).float().to(self.dev)
-        #decoder_inputs_previous = torch.Tensor(encoder_inputs[:, -1, :]).unsqueeze(1).to(self.dev)
-        #decoder_inputs_previous2 = torch.Tensor(encoder_inputs[:, -2, :]).unsqueeze(1).to(self.dev)
+        # decoder_inputs_previous = torch.Tensor(encoder_inputs[:, -1, :]).unsqueeze(1).to(self.dev)
+        # decoder_inputs_previous2 = torch.Tensor(encoder_inputs[:, -2, :]).unsqueeze(1).to(self.dev)
         decoder_inputs_previous = torch.Tensor(encoder_inputs_with_noise[:, -1, :]).unsqueeze(1).to(self.dev)
         decoder_inputs_previous2 = torch.Tensor(encoder_inputs_with_noise[:, -2, :]).unsqueeze(1).to(self.dev)
         targets = torch.Tensor(targets).float().to(self.dev)                            # [N,T,D] = [64, 10, 63]
+        gan_targets = targets.clone().detach().requires_grad_(True)
         N, T, D = targets.size()                                                        # N = 64(batchsize), T=10, D=63
         targets = targets.contiguous().view(N, T, -1, 3).permute(0, 2, 1, 3)          # [64, 21, 10, 3]
+
+        gan_decoder_inputs = decoder_inputs.clone().detach().requires_grad_(True)
+        gan_decoder_inputs_previous = decoder_inputs_previous.clone().detach().requires_grad_(True)
+        gan_decoder_inputs_previous2 = decoder_inputs_previous2.clone().detach().requires_grad_(True)
 
         outputs, mean, log_var = self.model(encoder_inputs_p,
                                  encoder_inputs_v,
@@ -196,19 +312,39 @@ class REC_Processor(Processor):
         #st_mask = torch.from_numpy(self.M_dec_out).to(self.dev)
         #loss = self.vae_loss_function(outputs, targets, mean, log_var, st_mask = st_mask)
 
-        loss = self.vae_loss_function(outputs, targets, mean, log_var)
+        if mode =='generator':
+            loss = self.vae_loss_function(outputs, targets, mean, log_var)
 
-        self.optimizer.zero_grad()
-        loss.backward()
-        nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
-        self.optimizer.step()
+            outputs = outputs.permute(0, 2, 1, 3).contiguous().view(32, 10, -1)
+            gen_disco = self.discriminator(outputs, self.relrec_joint,
+                                       self.relsend_joint,
+                                       self.relrec_part,
+                                       self.relsend_part,
+                                       self.relrec_body,
+                                       self.relsend_body,
+                                       self.arg.lamda)
 
-        self.iter_info['loss'] = loss.data.item()
-        self.show_iter_info()
-        self.meta_info['iter'] += 1
+            # adversrial loss
+            real_labels = torch.FloatTensor(1).fill_(1.0)
+            real_labels = real_labels.requires_grad_(False)
+            real_labels = real_labels.expand_as(gen_disco).cuda()
+            # print(real_labels.requires_grad)
+            gan_loss = self.criterion(gen_disco, real_labels)
+            loss = 0.99* loss + 0.01*gan_loss
 
-        self.epoch_info['mean_loss']= np.mean(loss_value)
+            self.optimizer.zero_grad()
+            loss.backward()
+            nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
+            self.optimizer.step()
 
+            self.iter_info['loss'] = loss.data.item()
+            self.iter_info['gan_loss'] = gan_loss.data.item()
+            self.show_iter_info()
+            self.meta_info['iter'] += 1
+
+            self.epoch_info['mean_loss'] = np.mean(loss_value)
+
+        return mean, log_var, gan_decoder_inputs, gan_targets, gan_decoder_inputs_previous, gan_decoder_inputs_previous2
 
     def test(self, evaluation=True, iter_time=0, save_motion=False, phase=False):
 
