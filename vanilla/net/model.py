@@ -16,17 +16,15 @@ class Model(nn.Module):
         self.encoder_vel = Encoder(n_in_enc, graph_args_j, graph_args_p, graph_args_b, True, fusion_layer, cross_w, **kwargs)
         self.encoder_acl = Encoder(n_in_enc, graph_args_j, graph_args_p, graph_args_b, True, fusion_layer, cross_w, **kwargs)
         self.decoder = Decoder(n_in_dec, n_hid_dec, graph_args_j, **kwargs)
-        #self.linear = nn.Linear(n_hid_enc*3, n_hid_dec)
-        self.linear = nn.Linear(n_hid_enc, n_hid_dec)
+        self.linear = nn.Linear(n_hid_enc*3, n_hid_dec)
         self.relu = nn.ReLU()
 
     def forward(self, enc_p, enc_v, enc_a, dec_curr, dec_prev, dec_prev2,
                 t, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p=1):
         hidd_p = self.encoder_pos(enc_p, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p)
-        #hidd_v = self.encoder_vel(enc_v, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p)
-        #hidd_a = self.encoder_acl(enc_a, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p)
-        #hidden = self.linear(torch.cat((hidd_p, hidd_v, hidd_a), dim=1).permute(0,2,1)).permute(0,2,1)
-        hidden = self.linear(hidd_p.permute(0,2,1)).permute(0,2,1)
+        hidd_v = self.encoder_vel(enc_v, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p)
+        hidd_a = self.encoder_acl(enc_a, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p)
+        hidden = self.linear(torch.cat((hidd_p, hidd_v, hidd_a), dim=1).permute(0,2,1)).permute(0,2,1)
         hidden = self.relu(hidden)
         pred = self.decoder(dec_curr, dec_prev, dec_prev2, hidden, t)
         return pred
@@ -298,9 +296,8 @@ class Decoder(nn.Module):
                 ins_a = ins_p-pred_all[step-2]-ins_v # ins_v-(pred_all[step-2]-pred_all[step-3])
                 ins_v_dec = pred_all[step-1]-pred_all[step-2]
             n = torch.randn(ins_p.size()).cuda()*0.0005
-            #ins = torch.cat((ins_p+n, ins_v, ins_a), dim=-1)
-            # NOTE: remove velocity and acceleration
-            ins = ins_p+n
+            ins = torch.cat((ins_p+n, ins_v, ins_a), dim=-1)
+            # NOTE: un-removed velocity and acceleration
             pred_, hidden, res_ = self.step_forward(ins, hidden, step)
             pred_all.append(pred_)                                                 # [t, 64, 21, 3]
             res_all.append(res_)
