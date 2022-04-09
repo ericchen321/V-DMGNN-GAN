@@ -95,7 +95,7 @@ def generate_gif_animation(npz_dir_list, output_dir, angle_list, axis_list, colo
         body_mesh = []
         for j in range(num_instances):
             body_mesh.append(trimesh.Trimesh(vertices=c2c(body_pose_beta[j].v[i]), faces=faces,
-                                             vertex_colors=np.tile(color_list[j], (6890, 1))))
+                                             vertex_colors=np.tile(colors[color_list[j]], (6890, 1))))
 
             body_mesh[j].apply_transform(trimesh.transformations.rotation_matrix(
                 np.radians(angle_list[j]), axis_list[j]))
