@@ -1,6 +1,7 @@
 import imageio
 from tqdm import tqdm
 import numpy as np
+import os
 import torch
 import trimesh
 from body_visualizer.tools.vis_tools import colors, imagearray2file
@@ -30,7 +31,7 @@ def generate_gif_animation(npz_dir_list, output_dir, angle_list, axis_list, colo
         npz_dir_list (list of str): list of npz file dir for multiple instances
         output_dir (str): dir to store output images and gif
         angle_list (list of float): list of angles (one per instance, fixed)
-        axis_list (list of tuple): axis of rotation for angle
+        axis_list (list of tuple): axis of rotation for angle (must be unit vector)
         color_list (list of str): pre-defined color for each instance
                                   'pink': [0.6, 0.0, 0.4],
                                   'purple': [0.9, 0.7, 0.7],
@@ -86,6 +87,9 @@ def generate_gif_animation(npz_dir_list, output_dir, angle_list, axis_list, colo
                       for i in range(num_instances)]
 
     # Generate images
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+
     for i in tqdm(range(seq_length)):
         images = np.zeros([1, 1, 1, imw, imh, 3])
         body_mesh = []
