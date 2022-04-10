@@ -118,7 +118,7 @@ class REC_Processor(Processor):
         KLD = - 0.5 * torch.sum(1+ log_var - mean_val.pow(2) - log_var.exp())
         return reconstruction_loss + 0.1*KLD
 
-
+    '''
     def build_masking_matrix_add_noise(self, unmasked_matrix, joint_indices):
         r"""
         Build masking matrix with same shape as `unmasked_matrix`
@@ -132,7 +132,8 @@ class REC_Processor(Processor):
                         M[i, j, k, :] = np.random.normal(0,0.5,1)       
         #M[:, :, joint_indices, :] = np.random.normal(0,0.5,3)
         M = M.reshape(unmasked_matrix.shape)
-        return M      
+        return M
+    '''
 
     def build_masking_matrix(self, unmasked_matrix, joint_indices):
         r"""
@@ -157,6 +158,7 @@ class REC_Processor(Processor):
     def build_noise_matrix(self, unmasked_matrix, joint_indices):
         """
         Build noise matrix with same shape as `unmasked_matrix`
+        Same implementation as build_masking_matrix_add_noise() by Anushree
         """
         M = np.zeros_like(unmasked_matrix)
         M = M.reshape(M.shape[0], M.shape[1], -1, 3) # batch size, T, J, 3
@@ -168,7 +170,6 @@ class REC_Processor(Processor):
         #M[:, :, joint_indices, :] = np.random.normal(0,0.5,3)
         M = M.reshape(unmasked_matrix.shape)
         return M
-
 
     def train(self):
 
@@ -306,14 +307,13 @@ class REC_Processor(Processor):
         decoder_noise = self.build_noise_matrix(decoder_inputs, self.lower_body_joints)
         encoder_noise = self.build_noise_matrix(encoder_inputs, self.lower_body_joints)
         
-        #mask encoder inputs and decoder inputs
+        # mask encoder inputs and decoder inputs
         encoder_inputs = np.multiply(self.M_enc_in, encoder_inputs)
         decoder_inputs = np.multiply(self.M_dec_in, decoder_inputs)
-        decoder_inputs = np.add(decoder_inputs,decoder_noise)
 
         # add noise to masked encoder/decoder inputs
         encoder_inputs = np.add(encoder_inputs, encoder_noise)
-        decoder_inputs = np.add(decoder_inputs,decoder_noise)
+        decoder_inputs = np.add(decoder_inputs, decoder_noise)
 
         encoder_inputs_v = np.zeros_like(encoder_inputs)
         encoder_inputs_v[:, 1:, :] = encoder_inputs[:, 1:, :]-encoder_inputs[:, :-1, :]
@@ -325,8 +325,6 @@ class REC_Processor(Processor):
         encoder_inputs_a = torch.Tensor(encoder_inputs_a).float().to(self.dev)
 
         decoder_inputs = torch.Tensor(decoder_inputs).float().to(self.dev)
-        #decoder_inputs_previous = torch.Tensor(encoder_inputs[:, -1, :]).unsqueeze(1).to(self.dev)
-        #decoder_inputs_previous2 = torch.Tensor(encoder_inputs[:, -2, :]).unsqueeze(1).to(self.dev)
         decoder_inputs_previous = torch.Tensor(encoder_inputs[:, -1, :]).unsqueeze(1).to(self.dev)
         decoder_inputs_previous2 = torch.Tensor(encoder_inputs[:, -2, :]).unsqueeze(1).to(self.dev)
         targets = torch.Tensor(targets).float().to(self.dev)
@@ -440,9 +438,6 @@ class REC_Processor(Processor):
             encoder_inputs_p = torch.Tensor(encoder_inputs).float().to(self.dev)                         # [N,T,D] = [64, 49, 63]
             encoder_inputs_v = torch.Tensor(encoder_inputs_v).float().to(self.dev)                       # [N,T,D] = [64, 49, 63]
             encoder_inputs_a = torch.Tensor(encoder_inputs_a).float().to(self.dev)
-            # for saving motion
-            N, T, D = encoder_inputs_p.shape
-            encoder_inputs_p_4d = encoder_inputs_p.view(N, T, -1, 3).permute(0, 2, 1, 3)                 # Eric: [N, V, T, 3]  same with targets for saving motion
 
             decoder_inputs = torch.Tensor(decoder_inputs).float().to(self.dev)                           # [N,T,D] = [64,  1, 63]
             #decoder_inputs_previous = torch.Tensor(encoder_inputs[:, -1, :]).unsqueeze(1).to(self.dev)
@@ -458,11 +453,10 @@ class REC_Processor(Processor):
             #mask encoder inputs and decoder inputs
             encoder_inputs = np.multiply(self.M_enc_in, encoder_inputs)
             decoder_inputs = np.multiply(self.M_dec_in, decoder_inputs)
-            decoder_inputs = np.add(decoder_inputs,decoder_noise)
 
             # add noise to masked encoder/decoder inputs
             encoder_inputs = np.add(encoder_inputs, encoder_noise)
-            decoder_inputs = np.add(decoder_inputs,decoder_noise)
+            decoder_inputs = np.add(decoder_inputs, decoder_noise)
 
             encoder_inputs_v = np.zeros_like(encoder_inputs)
             encoder_inputs_v[:, 1:, :] = encoder_inputs[:, 1:, :]-encoder_inputs[:, :-1, :]
@@ -473,6 +467,10 @@ class REC_Processor(Processor):
             encoder_inputs_v = torch.Tensor(encoder_inputs_v).float().to(self.dev)
             encoder_inputs_a = torch.Tensor(encoder_inputs_a).float().to(self.dev)
 
+            # for saving motion
+            N, T, D = encoder_inputs_p.shape
+            encoder_inputs_p_4d = encoder_inputs_p.view(N, T, -1, 3).permute(0, 2, 1, 3)                 # Eric: [N, V, T, 3]  same with targets for saving motion
+            
             decoder_inputs = torch.Tensor(decoder_inputs).float().to(self.dev)
             decoder_inputs_previous = torch.Tensor(encoder_inputs[:, -1, :]).unsqueeze(1).to(self.dev)
             decoder_inputs_previous2 = torch.Tensor(encoder_inputs[:, -2, :]).unsqueeze(1).to(self.dev)            
