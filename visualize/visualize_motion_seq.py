@@ -216,9 +216,9 @@ if __name__ == '__main__':
     output_seq_length = pose_stats["output_seq_length"]
     
     # visualize input
-    intput_frames_to_vis = [input_seq_length-i for i in range(9, 0, -2)]
+    intput_frames_to_vis = [input_seq_length-i for i in range(5, 0, -2)]
     visualize_input(input_poses_4d, intput_frames_to_vis, args.img_dir)
 
     # visualize output vs target
-    output_frames_to_vis = [i for i in range(0, 9, 2)]
+    output_frames_to_vis = [i for i in range(0, 5, 2)]
     visualize_target_and_output(target_poses_4d, output_poses_4d, output_frames_to_vis, args.img_dir)
