@@ -154,6 +154,22 @@ class REC_Processor(Processor):
         return M_enc_in, M_dec_in
 
 
+    def build_noise_matrix(self, unmasked_matrix, joint_indices):
+        """
+        Build noise matrix with same shape as `unmasked_matrix`
+        """
+        M = np.zeros_like(unmasked_matrix)
+        M = M.reshape(M.shape[0], M.shape[1], -1, 3) # batch size, T, J, 3
+        for i in range(M.shape[0]):
+            for j in range(M.shape[1]):
+                for k in range(M.shape[2]):
+                    if k in joint_indices:
+                        M[i, j, k, :] = np.random.normal(0,0.5,1)       
+        #M[:, :, joint_indices, :] = np.random.normal(0,0.5,3)
+        M = M.reshape(unmasked_matrix.shape)
+        return M
+
+
     def train(self):
 
         if self.meta_info['iter'] % 2 == 0:
@@ -258,7 +274,7 @@ class REC_Processor(Processor):
             encoder_inputs,
             decoder_inputs
         )
-
+        '''
         decoder_noise = self.build_masking_matrix_add_noise(decoder_inputs, self.lower_body_joints)
         encoder_noise = self.build_masking_matrix_add_noise(encoder_inputs, self.lower_body_joints)
         
@@ -285,6 +301,36 @@ class REC_Processor(Processor):
         decoder_inputs_previous = torch.Tensor(encoder_inputs_with_noise[:, -1, :]).unsqueeze(1).to(self.dev)
         decoder_inputs_previous2 = torch.Tensor(encoder_inputs_with_noise[:, -2, :]).unsqueeze(1).to(self.dev)
         targets = torch.Tensor(targets).float().to(self.dev)                            # [N,T,D] = [64, 10, 63]
+        '''
+
+        decoder_noise = self.build_noise_matrix(decoder_inputs, self.lower_body_joints)
+        encoder_noise = self.build_noise_matrix(encoder_inputs, self.lower_body_joints)
+        
+        #mask encoder inputs and decoder inputs
+        encoder_inputs = np.multiply(self.M_enc_in, encoder_inputs)
+        decoder_inputs = np.multiply(self.M_dec_in, decoder_inputs)
+        decoder_inputs = np.add(decoder_inputs,decoder_noise)
+
+        # add noise to masked encoder/decoder inputs
+        encoder_inputs = np.add(encoder_inputs, encoder_noise)
+        decoder_inputs = np.add(decoder_inputs,decoder_noise)
+
+        encoder_inputs_v = np.zeros_like(encoder_inputs)
+        encoder_inputs_v[:, 1:, :] = encoder_inputs[:, 1:, :]-encoder_inputs[:, :-1, :]
+        encoder_inputs_a = np.zeros_like(encoder_inputs)
+        encoder_inputs_a[:, :-1, :] = encoder_inputs_v[:, 1:, :]-encoder_inputs_v[:, :-1, :]
+
+        encoder_inputs_p = torch.Tensor(encoder_inputs).float().to(self.dev)
+        encoder_inputs_v = torch.Tensor(encoder_inputs_v).float().to(self.dev)
+        encoder_inputs_a = torch.Tensor(encoder_inputs_a).float().to(self.dev)
+
+        decoder_inputs = torch.Tensor(decoder_inputs).float().to(self.dev)
+        #decoder_inputs_previous = torch.Tensor(encoder_inputs[:, -1, :]).unsqueeze(1).to(self.dev)
+        #decoder_inputs_previous2 = torch.Tensor(encoder_inputs[:, -2, :]).unsqueeze(1).to(self.dev)
+        decoder_inputs_previous = torch.Tensor(encoder_inputs[:, -1, :]).unsqueeze(1).to(self.dev)
+        decoder_inputs_previous2 = torch.Tensor(encoder_inputs[:, -2, :]).unsqueeze(1).to(self.dev)
+        targets = torch.Tensor(targets).float().to(self.dev)
+
         gan_targets = targets.clone().detach().requires_grad_(True)
         N, T, D = targets.size()                                                        # N = 64(batchsize), T=10, D=63
         targets = targets.contiguous().view(N, T, -1, 3).permute(0, 2, 1, 3)          # [64, 21, 10, 3]
@@ -330,7 +376,7 @@ class REC_Processor(Processor):
             real_labels = real_labels.expand_as(gen_disco).cuda()
             # print(real_labels.requires_grad)
             gan_loss = self.criterion(gen_disco, real_labels)
-            loss = 0.99* loss + 0.01*gan_loss
+            loss = 0.9* loss + 0.1*gan_loss
 
             self.optimizer.zero_grad()
             loss.backward()
@@ -346,7 +392,7 @@ class REC_Processor(Processor):
 
         return mean, log_var, gan_decoder_inputs, gan_targets, gan_decoder_inputs_previous, gan_decoder_inputs_previous2
 
-    def test(self, evaluation=True, iter_time=0, save_motion=False, phase=False):
+    def test(self, evaluation=True, iter_time=0, save_motion=True, phase=False):
 
         self.model.eval()
         loss_value = []
@@ -373,6 +419,8 @@ class REC_Processor(Processor):
                 decoder_inputs
             )
             
+
+            '''
             decoder_noise = self.build_masking_matrix_add_noise(decoder_inputs, self.lower_body_joints)
             encoder_noise = self.build_masking_matrix_add_noise(encoder_inputs, self.lower_body_joints)
         
@@ -399,6 +447,34 @@ class REC_Processor(Processor):
             decoder_inputs_previous = torch.Tensor(encoder_inputs_with_noise[:, -1, :]).unsqueeze(1).to(self.dev)
             decoder_inputs_previous2 = torch.Tensor(encoder_inputs_with_noise[:, -2, :]).unsqueeze(1).to(self.dev)
             targets = torch.Tensor(targets).float().to(self.dev)                                         # [N,T,D] = [64, 25, 63]
+            '''
+
+            decoder_noise = self.build_noise_matrix(decoder_inputs, self.lower_body_joints)
+            encoder_noise = self.build_noise_matrix(encoder_inputs, self.lower_body_joints)
+        
+            #mask encoder inputs and decoder inputs
+            encoder_inputs = np.multiply(self.M_enc_in, encoder_inputs)
+            decoder_inputs = np.multiply(self.M_dec_in, decoder_inputs)
+            decoder_inputs = np.add(decoder_inputs,decoder_noise)
+
+            # add noise to masked encoder/decoder inputs
+            encoder_inputs = np.add(encoder_inputs, encoder_noise)
+            decoder_inputs = np.add(decoder_inputs,decoder_noise)
+
+            encoder_inputs_v = np.zeros_like(encoder_inputs)
+            encoder_inputs_v[:, 1:, :] = encoder_inputs[:, 1:, :]-encoder_inputs[:, :-1, :]
+            encoder_inputs_a = np.zeros_like(encoder_inputs)
+            encoder_inputs_a[:, :-1, :] = encoder_inputs_v[:, 1:, :]-encoder_inputs_v[:, :-1, :]
+
+            encoder_inputs_p = torch.Tensor(encoder_inputs).float().to(self.dev)
+            encoder_inputs_v = torch.Tensor(encoder_inputs_v).float().to(self.dev)
+            encoder_inputs_a = torch.Tensor(encoder_inputs_a).float().to(self.dev)
+
+            decoder_inputs = torch.Tensor(decoder_inputs).float().to(self.dev)
+            decoder_inputs_previous = torch.Tensor(encoder_inputs[:, -1, :]).unsqueeze(1).to(self.dev)
+            decoder_inputs_previous2 = torch.Tensor(encoder_inputs[:, -2, :]).unsqueeze(1).to(self.dev)            
+            targets = torch.Tensor(targets).float().to(self.dev)
+
             N, T, D = targets.size()                                                         
             targets = targets.contiguous().view(N, T, -1, 3).permute(0, 2, 1, 3)                         # [64, 21, 25, 3]  same with outputs for validation loss
 
