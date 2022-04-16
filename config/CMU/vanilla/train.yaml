@@ -39,6 +39,9 @@ base_lr: 0.00005
 use_gpu: True
 device: [1]
 
+eval_interval: 1000
+save_interval: 5000
+
 lamda: 0.6
 fusion_layer_dir: fusion_2
 learning_rate_dir: adam_1e-4
