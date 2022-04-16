@@ -108,19 +108,20 @@ class REC_Processor(Processor):
         M = M.reshape(unmasked_matrix.shape)
         return M
 
-    def build_noise_matrix(self, unmasked_matrix, joint_indices):
+    def build_noise_matrix(self, pose_matrix, masking_matrix):
         r"""
-        Build noise matrix with same shape as `unmasked_matrix`
+        Build noise matrix with same shape as `pose_matrix`. We replace
+        each masked joint angle by an IID Gaussian noise signal following
+        distribution N(0, 0.5)
+        :param pose_matrix: matrix of poses
+        :param masking_matrix: binary masking matrix for `pose_matrix`
+
+        Return:
+        Noise matrix with same shape as `pose_matrix`
         """
-        M = np.zeros_like(unmasked_matrix)
-        M = M.reshape(M.shape[0], M.shape[1], -1, 3) # batch size, T, J, 3
-        for i in range(M.shape[0]):
-            for j in range(M.shape[1]):
-                for k in range(M.shape[2]):
-                    if k in joint_indices:
-                        M[i, j, k, :] = np.random.normal(0,0.5,1)       
-        #M[:, :, joint_indices, :] = np.random.normal(0,0.5,3)
-        M = M.reshape(unmasked_matrix.shape)
+        M = np.random.normal(loc=0, scale=0.5, size=pose_matrix.shape)
+        inverted_mask_matrix = (~masking_matrix.astype(np.bool)).astype(np.float32)
+        M = np.multiply(M, inverted_mask_matrix)
         return M
     
     def build_lower_body_masking_matrices(self, lower_body_joints, encoder_inputs, decoder_inputs, targets):
@@ -129,8 +130,19 @@ class REC_Processor(Processor):
         # build decoder input mask
         M_dec_in = self.build_masking_matrix(decoder_inputs, lower_body_joints)
         # build decoder output / target mask
-        M_dec_out = self.build_masking_matrix(targets, lower_body_joints)
-        return M_enc_in, M_dec_in, M_dec_out
+        #M_dec_out = self.build_masking_matrix(targets, lower_body_joints)
+        #return M_enc_in, M_dec_in, M_dec_out
+        return M_enc_in, M_dec_in
+
+    def build_random_masking_matrices(self, encoder_inputs, decoder_inputs, seed=None, p=0.8):
+        # set seed
+        if seed is not None:
+            np.random.seed(seed)
+        # build encoder input mask
+        M_enc_in = np.random.binomial(n=1, p=p, size=encoder_inputs.shape).astype(np.float32)
+        # build decoder input mask
+        M_dec_in = np.random.binomial(n=1, p=p, size=decoder_inputs.shape).astype(np.float32)
+        return M_enc_in, M_dec_in
     
     def train(self):
         self.model.train()
@@ -144,16 +156,28 @@ class REC_Processor(Processor):
                                                                self.arg.target_seq_len, 
                                                                len(self.dim_use))
         #build lower-body masking matrices
-        self.M_enc_in, self.M_dec_in, self.M_dec_out = self.build_lower_body_masking_matrices(
-            self.lower_body_joints,
+        # self.M_enc_in, self.M_dec_in = self.build_lower_body_masking_matrices(
+        #     self.lower_body_joints,
+        #     encoder_inputs,
+        #     decoder_inputs
+        # )
+        self.M_enc_in, self.M_dec_in = self.build_random_masking_matrices(
             encoder_inputs,
             decoder_inputs,
-            targets
+            p=0.8
         )
         
         #mask encoder inputs and decoder inputs
         encoder_inputs = np.multiply(self.M_enc_in, encoder_inputs)
         decoder_inputs = np.multiply(self.M_dec_in, decoder_inputs)
+
+        # build noise matrix
+        encoder_noise = self.build_noise_matrix(encoder_inputs, self.M_enc_in)
+        decoder_noise = self.build_noise_matrix(decoder_inputs, self.M_dec_in)
+
+        # add noise to masked encoder/decoder inputs
+        encoder_inputs = np.add(encoder_inputs, encoder_noise)
+        decoder_inputs = np.add(decoder_inputs, decoder_noise)
 
         encoder_inputs_v = np.zeros_like(encoder_inputs)
         encoder_inputs_v[:, 1:, :] = encoder_inputs[:, 1:, :]-encoder_inputs[:, :-1, :]
@@ -187,8 +211,9 @@ class REC_Processor(Processor):
                              self.arg.lamda)
 
         # convert spatio-temporal masking matrix to a tensor
-        st_mask = torch.from_numpy(self.M_dec_out).to(self.dev)
-        loss = self.loss_l1(outputs, targets, st_mask=st_mask)
+        # st_mask = torch.from_numpy(self.M_dec_out).to(self.dev)
+        # loss = self.loss_l1(outputs, targets, st_mask=st_mask)
+        loss = self.loss_l1(outputs, targets, st_mask=None)
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -223,24 +248,28 @@ class REC_Processor(Processor):
                                                                   len(self.dim_use))
 
             #build lower-body masking matrices
-            self.M_enc_in, self.M_dec_in, self.M_dec_out = self.build_lower_body_masking_matrices(
-                self.lower_body_joints,
+            # self.M_enc_in, self.M_dec_in = self.build_lower_body_masking_matrices(
+            #     self.lower_body_joints,
+            #     encoder_inputs,
+            #     decoder_inputs
+            # )
+            self.M_enc_in, self.M_dec_in = self.build_random_masking_matrices(
                 encoder_inputs,
                 decoder_inputs,
-                targets
+                p=0.8
             )
 
-            # build lower-body noise matrix
-            encoder_noise = self.build_noise_matrix(encoder_inputs, self.lower_body_joints)
-            decoder_noise = self.build_noise_matrix(decoder_inputs, self.lower_body_joints)
-            
             #mask encoder inputs and decoder inputs
             encoder_inputs = np.multiply(self.M_enc_in, encoder_inputs)
             decoder_inputs = np.multiply(self.M_dec_in, decoder_inputs)
 
+            # build noise matrix
+            encoder_noise = self.build_noise_matrix(encoder_inputs, self.M_enc_in)
+            decoder_noise = self.build_noise_matrix(decoder_inputs, self.M_dec_in)
+
             # add noise to masked encoder/decoder inputs
             encoder_inputs = np.add(encoder_inputs, encoder_noise)
-            decoder_inputs = np.add(decoder_inputs,decoder_noise)
+            decoder_inputs = np.add(decoder_inputs, decoder_noise)
 
             encoder_inputs_v = np.zeros_like(encoder_inputs)
             encoder_inputs_v[:, 1:, :] = encoder_inputs[:, 1:, :]-encoder_inputs[:, :-1, :]
