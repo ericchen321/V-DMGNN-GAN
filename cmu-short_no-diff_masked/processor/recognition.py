@@ -262,10 +262,15 @@ class REC_Processor(Processor):
                                                                   len(self.dim_use))
 
             #build lower-body masking matrices
-            self.M_enc_in, self.M_dec_in = self.build_lower_body_masking_matrices(
-                self.lower_body_joints,
+            # self.M_enc_in, self.M_dec_in = self.build_lower_body_masking_matrices(
+            #     self.lower_body_joints,
+            #     encoder_inputs,
+            #     decoder_inputs
+            # )
+            self.M_enc_in, self.M_dec_in = self.build_random_masking_matrices(
                 encoder_inputs,
-                decoder_inputs
+                decoder_inputs,
+                p=0.8
             )
             
             #mask encoder inputs and decoder inputs
