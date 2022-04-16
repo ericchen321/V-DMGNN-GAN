@@ -120,17 +120,20 @@ class REC_Processor(Processor):
         M = M.reshape(unmasked_matrix.shape)
         return M
 
-    def build_noise_matrix(self, unmasked_matrix, joint_indices):
+    def build_noise_matrix(self, pose_matrix, masking_matrix):
         r"""
-        Build noise matrix with same shape as `unmasked_matrix`
+        Build noise matrix with same shape as `pose_matrix`. We replace
+        each masked joint angle by an IID Gaussian noise signal following
+        distribution N(0, 0.5)
+        :param pose_matrix: matrix of poses
+        :param masking_matrix: binary masking matrix for `pose_matrix`
+
+        Return:
+        Noise matrix with same shape as `pose_matrix`
         """
-        M = np.zeros_like(unmasked_matrix)
-        M = M.reshape(M.shape[0], M.shape[1], -1, 3) # batch size, T, J, 3
-        for k in joint_indices:
-            M[:, :, k, :] = np.random.normal(
-                loc=0, scale=0.5, size=(M.shape[0], M.shape[1], M.shape[3]))
-        #M[:, :, joint_indices, :] = np.random.normal(0,0.5,3)
-        M = M.reshape(unmasked_matrix.shape)
+        M = np.random.normal(loc=0, scale=0.5, size=pose_matrix.shape)
+        inverted_mask_matrix = (~masking_matrix.astype(np.bool)).astype(np.float32)
+        M = np.multiply(M, inverted_mask_matrix)
         return M
     
     def build_lower_body_masking_matrices(self, lower_body_joints, encoder_inputs, decoder_inputs):
@@ -177,13 +180,13 @@ class REC_Processor(Processor):
             p=0.8
         )
         
-        # build noise matrix
-        encoder_noise = self.build_noise_matrix(encoder_inputs, self.lower_body_joints)
-        decoder_noise = self.build_noise_matrix(decoder_inputs, self.lower_body_joints)
-        
         # mask encoder inputs and decoder inputs
         encoder_inputs = np.multiply(self.M_enc_in, encoder_inputs)
         decoder_inputs = np.multiply(self.M_dec_in, decoder_inputs)
+
+        # build noise matrix
+        encoder_noise = self.build_noise_matrix(encoder_inputs, self.M_enc_in)
+        decoder_noise = self.build_noise_matrix(decoder_inputs, self.M_dec_in)
 
         # add noise to masked encoder/decoder inputs
         encoder_inputs = np.add(encoder_inputs, encoder_noise)
@@ -265,13 +268,13 @@ class REC_Processor(Processor):
                 decoder_inputs
             )
             
-            # build noise matrix
-            encoder_noise = self.build_noise_matrix(encoder_inputs, self.lower_body_joints)
-            decoder_noise = self.build_noise_matrix(decoder_inputs, self.lower_body_joints)
-            
             #mask encoder inputs and decoder inputs
             encoder_inputs = np.multiply(self.M_enc_in, encoder_inputs)
             decoder_inputs = np.multiply(self.M_dec_in, decoder_inputs)
+
+            # build noise matrix
+            encoder_noise = self.build_noise_matrix(encoder_inputs, self.M_enc_in)
+            decoder_noise = self.build_noise_matrix(decoder_inputs, self.M_dec_in)
 
             # add noise to masked encoder/decoder inputs
             encoder_inputs = np.add(encoder_inputs, encoder_noise)
