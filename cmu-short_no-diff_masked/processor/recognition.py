@@ -79,24 +79,36 @@ class REC_Processor(Processor):
         else:
             raise ValueError('No such Optimizer')
 
-
-    def loss_l1(self, pred, target, mask=None, st_mask=None):
-        if st_mask is None:
-            dist = torch.abs(pred-target).mean(-1).mean(1).mean(0)
-        else:
-            # NOTE by Eric:
-            # pred has shape batch_size, J, T, 3;
-            # st_mask has shape batch_size, T, Jx3
-            st_mask_xformed = st_mask.view(pred.shape[0], pred.shape[2], -1, 3).permute(0, 2, 1, 3)
-            dist = torch.abs(
-                pred*st_mask_xformed-target*st_mask_xformed
-            ).mean(-1).mean(1).mean(0)
-        
+    def loss_l1(self, pred, target, mask=None):
+        dist = torch.abs(pred-target).mean(-1).mean(1).mean(0)
         if mask is not None:
             dist = dist * mask
         loss = torch.mean(dist)
         return loss
 
+    def vae_loss_function(self, pred, target, mean_val, log_var):
+        assert pred.shape == target.shape
+        reconstruction_loss = self.loss_l1(pred, target)
+        mean_val = mean_val.mean(-1).mean(1).mean(0)
+        log_var = log_var.mean(-1).mean(1).mean(0)
+        KLD = - 0.5 * torch.sum(1+ log_var - mean_val.pow(2) - log_var.exp())
+        return reconstruction_loss + 0.1*KLD    
+
+
+    def build_masking_matrix_add_noise(self, unmasked_matrix, joint_indices):
+        r"""
+        Build masking matrix with same shape as `unmasked_matrix`
+        """
+        M = np.zeros_like(unmasked_matrix)
+        M = M.reshape(M.shape[0], M.shape[1], -1, 3) # batch size, T, J, 3
+        for i in range(M.shape[0]):
+            for j in range(M.shape[1]):
+                for k in range(M.shape[2]):
+                    if k in joint_indices:
+                        M[i, j, k, :] = np.random.normal(0,0.5,1)       
+        #M[:, :, joint_indices, :] = np.random.normal(0,0.5,3)
+        M = M.reshape(unmasked_matrix.shape)
+        return M      
 
     def build_masking_matrix(self, unmasked_matrix, joint_indices):
         r"""
@@ -107,15 +119,42 @@ class REC_Processor(Processor):
         M[:, :, joint_indices, :] = np.zeros((3,))
         M = M.reshape(unmasked_matrix.shape)
         return M
+
+    def build_noise_matrix(self, pose_matrix, masking_matrix):
+        r"""
+        Build noise matrix with same shape as `pose_matrix`. We replace
+        each masked joint angle by an IID Gaussian noise signal following
+        distribution N(0, 0.5)
+        :param pose_matrix: matrix of poses
+        :param masking_matrix: binary masking matrix for `pose_matrix`
+
+        Return:
+        Noise matrix with same shape as `pose_matrix`
+        """
+        M = np.random.normal(loc=0, scale=0.5, size=pose_matrix.shape)
+        inverted_mask_matrix = (~masking_matrix.astype(np.bool)).astype(np.float32)
+        M = np.multiply(M, inverted_mask_matrix)
+        return M
     
-    def build_lower_body_masking_matrices(self, lower_body_joints, encoder_inputs, decoder_inputs, targets):
+    def build_lower_body_masking_matrices(self, lower_body_joints, encoder_inputs, decoder_inputs):
         # build encoder input mask
         M_enc_in = self.build_masking_matrix(encoder_inputs, lower_body_joints)
         # build decoder input mask
         M_dec_in = self.build_masking_matrix(decoder_inputs, lower_body_joints)
         # build decoder output / target mask
-        M_dec_out = self.build_masking_matrix(targets, lower_body_joints)
-        return M_enc_in, M_dec_in, M_dec_out
+        #M_dec_out = self.build_masking_matrix(targets, lower_body_joints)
+        return M_enc_in, M_dec_in
+
+    def build_random_masking_matrices(self, encoder_inputs, decoder_inputs, seed=None, p=0.8):
+        # set seed
+        if seed is not None:
+            np.random.seed(seed)
+            
+        # build encoder input mask
+        M_enc_in = np.random.binomial(n=1, p=p, size=encoder_inputs.shape).astype(np.float32)
+        # build decoder input mask
+        M_dec_in = np.random.binomial(n=1, p=p, size=decoder_inputs.shape).astype(np.float32)
+        return M_enc_in, M_dec_in
     
     def train(self):
         self.model.train()
@@ -128,17 +167,30 @@ class REC_Processor(Processor):
                                                                self.arg.source_seq_len, 
                                                                self.arg.target_seq_len, 
                                                                len(self.dim_use))
+
         #build lower-body masking matrices
-        self.M_enc_in, self.M_dec_in, self.M_dec_out = self.build_lower_body_masking_matrices(
-            self.lower_body_joints,
+        # self.M_enc_in, self.M_dec_in = self.build_lower_body_masking_matrices(
+        #     self.lower_body_joints,
+        #     encoder_inputs,
+        #     decoder_inputs
+        # )
+        self.M_enc_in, self.M_dec_in = self.build_random_masking_matrices(
             encoder_inputs,
             decoder_inputs,
-            targets
+            p=0.8
         )
         
-        #mask encoder inputs and decoder inputs
+        # mask encoder inputs and decoder inputs
         encoder_inputs = np.multiply(self.M_enc_in, encoder_inputs)
         decoder_inputs = np.multiply(self.M_dec_in, decoder_inputs)
+
+        # build noise matrix
+        encoder_noise = self.build_noise_matrix(encoder_inputs, self.M_enc_in)
+        decoder_noise = self.build_noise_matrix(decoder_inputs, self.M_dec_in)
+
+        # add noise to masked encoder/decoder inputs
+        encoder_inputs = np.add(encoder_inputs, encoder_noise)
+        decoder_inputs = np.add(decoder_inputs, decoder_noise)
 
         encoder_inputs_v = np.zeros_like(encoder_inputs)
         encoder_inputs_v[:, 1:, :] = encoder_inputs[:, 1:, :]-encoder_inputs[:, :-1, :]
@@ -156,24 +208,26 @@ class REC_Processor(Processor):
         N, T, D = targets.size()                                                        # N = 64(batchsize), T=10, D=63
         targets = targets.contiguous().view(N, T, -1, 3).permute(0, 2, 1, 3)          # [64, 21, 10, 3]
 
-        outputs = self.model(encoder_inputs_p,
-                             encoder_inputs_v,
-                             encoder_inputs_a,
-                             decoder_inputs,
-                             decoder_inputs_previous,
-                             decoder_inputs_previous2,
-                             self.arg.target_seq_len,
-                             self.relrec_joint,
-                             self.relsend_joint,
-                             self.relrec_part,
-                             self.relsend_part,
-                             self.relrec_body,
-                             self.relsend_body,
-                             self.arg.lamda)
+        outputs, mean, log_var = self.model(encoder_inputs_p,
+                                 encoder_inputs_v,
+                                 encoder_inputs_a,
+                                 decoder_inputs,
+                                 decoder_inputs_previous,
+                                 decoder_inputs_previous2,
+                                 self.arg.target_seq_len,
+                                 self.relrec_joint,
+                                 self.relsend_joint,
+                                 self.relrec_part,
+                                 self.relsend_part,
+                                 self.relrec_body,
+                                 self.relsend_body,
+                                 self.arg.lamda)
 
         # convert spatio-temporal masking matrix to a tensor
-        st_mask = torch.from_numpy(self.M_dec_out).to(self.dev)
-        loss = self.loss_l1(outputs, targets, st_mask=st_mask)
+        #st_mask = torch.from_numpy(self.M_dec_out).to(self.dev)
+        #loss = self.vae_loss_function(outputs, targets, mean, log_var, st_mask = st_mask)
+
+        loss = self.vae_loss_function(outputs, targets, mean, log_var)
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -208,16 +262,28 @@ class REC_Processor(Processor):
                                                                   len(self.dim_use))
 
             #build lower-body masking matrices
-            self.M_enc_in, self.M_dec_in, self.M_dec_out = self.build_lower_body_masking_matrices(
-                self.lower_body_joints,
+            # self.M_enc_in, self.M_dec_in = self.build_lower_body_masking_matrices(
+            #     self.lower_body_joints,
+            #     encoder_inputs,
+            #     decoder_inputs
+            # )
+            self.M_enc_in, self.M_dec_in = self.build_random_masking_matrices(
                 encoder_inputs,
                 decoder_inputs,
-                targets
+                p=0.8
             )
             
             #mask encoder inputs and decoder inputs
             encoder_inputs = np.multiply(self.M_enc_in, encoder_inputs)
             decoder_inputs = np.multiply(self.M_dec_in, decoder_inputs)
+
+            # build noise matrix
+            encoder_noise = self.build_noise_matrix(encoder_inputs, self.M_enc_in)
+            decoder_noise = self.build_noise_matrix(decoder_inputs, self.M_dec_in)
+
+            # add noise to masked encoder/decoder inputs
+            encoder_inputs = np.add(encoder_inputs, encoder_noise)
+            decoder_inputs = np.add(decoder_inputs, decoder_noise)
 
             encoder_inputs_v = np.zeros_like(encoder_inputs)
             encoder_inputs_v[:, 1:, :] = encoder_inputs[:, 1:, :]-encoder_inputs[:, :-1, :]
@@ -227,9 +293,12 @@ class REC_Processor(Processor):
             encoder_inputs_p = torch.Tensor(encoder_inputs).float().to(self.dev)                         # [N,T,D] = [64, 49, 63]
             encoder_inputs_v = torch.Tensor(encoder_inputs_v).float().to(self.dev)                       # [N,T,D] = [64, 49, 63]
             encoder_inputs_a = torch.Tensor(encoder_inputs_a).float().to(self.dev)
+            # for saving motion
+            N, T, D = encoder_inputs_p.shape
+            encoder_inputs_p_4d = encoder_inputs_p.view(N, T, -1, 3).permute(0, 2, 1, 3)                 # Eric: [N, V, T, 3]  same with targets for saving motion
 
             decoder_inputs = torch.Tensor(decoder_inputs).float().to(self.dev)                           # [N,T,D] = [64,  1, 63]
-            decoder_inputs_previous = torch.Tensor(encoder_inputs[:, -1, :]).unsqueeze(1).to(self.dev)   # [N,T,D] = [64,  1, 63]
+            decoder_inputs_previous = torch.Tensor(encoder_inputs[:, -1, :]).unsqueeze(1).to(self.dev)
             decoder_inputs_previous2 = torch.Tensor(encoder_inputs[:, -2, :]).unsqueeze(1).to(self.dev)
             targets = torch.Tensor(targets).float().to(self.dev)                                         # [N,T,D] = [64, 25, 63]
             N, T, D = targets.size()                                                         
@@ -237,7 +306,7 @@ class REC_Processor(Processor):
 
             start_time = time.time()
             with torch.no_grad():
-                outputs = self.model(encoder_inputs_p,
+                outputs, mean, var = self.model(encoder_inputs_p,
                                      encoder_inputs_v,
                                      encoder_inputs_a,
                                      decoder_inputs,
@@ -253,13 +322,40 @@ class REC_Processor(Processor):
                                      self.arg.lamda)
 
             if evaluation:
-                mean_errors = np.zeros((8, 25), dtype=np.float32)
-                for i in np.arange(8):
-
+                num_samples_per_action = encoder_inputs_p_4d.shape[0]
+                mean_errors = np.zeros(
+                    (num_samples_per_action, self.arg.target_seq_len), dtype=np.float32)
+                # Eric: create data structs to save unnormalized inputs, outputs and targets
+                inputs_denorm = np.zeros(
+                    [num_samples_per_action,
+                    encoder_inputs_p_4d.shape[2],
+                    int(self.data_mean.shape[0]/3),
+                    3]) # num_samples_per_action, t_in, 39, 3
+                outputs_denorm = np.zeros(
+                    [num_samples_per_action,
+                    outputs.shape[2],
+                    int(self.data_mean.shape[0]/3),
+                    3]) # [num_samples_per_action, t_out, 39, 3]
+                targets_denorm = np.zeros(
+                    [num_samples_per_action,
+                    targets.shape[2],
+                    int(self.data_mean.shape[0]/3),
+                    3]) # [num_samples_per_action, t_out, V, 3]
+                
+                for i in np.arange(num_samples_per_action):
+                    input = encoder_inputs_p_4d[i] # V, t_in, d
+                    V, t, d = input.shape
+                    input = input.permute(1,0,2).contiguous().view(t, V*d)
+                    input_denorm = unnormalize_data(
+                        input.cpu().numpy(), self.data_mean, self.data_std, self.dim_ignore, self.dim_use, self.dim_zero)
+                    inputs_denorm[i] = input_denorm.reshape((t, -1, 3))
+                    
                     output = outputs[i]                   # output: [V, t, d] = [21, 25, 3]
                     V, t, d = output.shape
                     output = output.permute(1,0,2).contiguous().view(t, V*d)
-                    output_denorm = unnormalize_data(output.cpu().numpy(), self.data_mean, self.data_std, self.dim_ignore, self.dim_use, self.dim_zero)
+                    output_denorm = unnormalize_data(
+                        output.cpu().numpy(), self.data_mean, self.data_std, self.dim_ignore, self.dim_use, self.dim_zero)
+                    outputs_denorm[i] = output_denorm.reshape((t, -1, 3))
                     t, D = output_denorm.shape
                     output_euler = np.zeros((t,D) , dtype=np.float32)        # [21, 99]
                     for j in np.arange(t):
@@ -268,7 +364,9 @@ class REC_Processor(Processor):
 
                     target = targets[i]
                     target = target.permute(1,0,2).contiguous().view(t, V*d)
-                    target_denorm = unnormalize_data(target.cpu().numpy(), self.data_mean, self.data_std, self.dim_ignore, self.dim_use, self.dim_zero)
+                    target_denorm = unnormalize_data(
+                        target.cpu().numpy(), self.data_mean, self.data_std, self.dim_ignore, self.dim_use, self.dim_zero)
+                    targets_denorm[i] = target_denorm.reshape((t, -1, 3))
                     target_euler = np.zeros((t,D) , dtype=np.float32)
                     for j in np.arange(t):
                         for k in np.arange(0,115,3):
@@ -288,7 +386,12 @@ class REC_Processor(Processor):
                     save_dir = os.path.join(self.save_dir,'motions_exp'+str(iter_time*self.arg.savemotion_interval))
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
-                    np.save(save_dir+'/motions_'+action+'.npy', outputs.cpu().numpy())
+                    # save unnormalized inputs
+                    np.save(save_dir+f"/motions_{action}_inputs.npy", inputs_denorm)
+                    # save unnormalized outputs
+                    np.save(save_dir+f"/motions_{action}_outputs.npy", outputs_denorm)
+                    # save unnormalized targets
+                    np.save(save_dir+f"/motions_{action}_targets.npy", targets_denorm)
 
                 print_str = "{0: <16} |".format(action)
                 for ms_idx, ms in enumerate([0,1,2,3,4,5,6,7,8,9,13,24]):

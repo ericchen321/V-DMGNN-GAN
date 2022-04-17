@@ -86,6 +86,21 @@ class REC_Processor(Processor):
         loss = torch.mean(dist)
         return loss
 
+    def vae_loss_function(self, pred, target, mean_val, log_var):
+        assert pred.shape == target.shape
+        reconstruction_loss = self.loss_l1(pred, target)
+        mean_val = mean_val.mean(-1).mean(1).mean(0)
+        log_var = log_var.mean(-1).mean(1).mean(0)
+        KLD = - 0.5 * torch.sum(1+ log_var - mean_val.pow(2) - log_var.exp())
+        return reconstruction_loss + 0.1*KLD 
+
+        #reconstruction_loss = torch.mean(torch.norm(target - pred, dim=len(target.shape) - 1))
+        #print("len(target.shape) : ", len(target.shape))
+        #print("reconstruct ion_lossshape) : ", reconstruction_loss.shape)
+        #KLD = -torch.mean(-0.5 * torch.sum(1 + log_var - mean_val ** 2 - log_var.exp(), dim = 1), dim = 0)
+        #print("mean_val shape : ", mean_val.shape)
+        #print("mean_val ", mean_val)       
+
 
     def train(self):
         self.model.train()
@@ -114,22 +129,22 @@ class REC_Processor(Processor):
         N, T, D = targets.size()                                                        # N = 64(batchsize), T=10, D=63
         targets = targets.contiguous().view(N, T, -1, 3).permute(0, 2, 1, 3)          # [64, 21, 10, 3]
 
-        outputs = self.model(encoder_inputs_p,
-                             encoder_inputs_v,
-                             encoder_inputs_a,
-                             decoder_inputs,
-                             decoder_inputs_previous,
-                             decoder_inputs_previous2,
-                             self.arg.target_seq_len,
-                             self.relrec_joint,
-                             self.relsend_joint,
-                             self.relrec_part,
-                             self.relsend_part,
-                             self.relrec_body,
-                             self.relsend_body,
-                             self.arg.lamda)
+        outputs, mean, log_var = self.model(encoder_inputs_p,
+                                 encoder_inputs_v,
+                                 encoder_inputs_a,
+                                 decoder_inputs,
+                                 decoder_inputs_previous,
+                                 decoder_inputs_previous2,
+                                 self.arg.target_seq_len,
+                                 self.relrec_joint,
+                                 self.relsend_joint,
+                                 self.relrec_part,
+                                 self.relsend_part,
+                                 self.relrec_body,
+                                 self.relsend_body,
+                                 self.arg.lamda)
 
-        loss = self.loss_l1(outputs, targets)
+        loss = self.vae_loss_function(outputs, targets, mean, log_var)
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -180,7 +195,7 @@ class REC_Processor(Processor):
 
             start_time = time.time()
             with torch.no_grad():
-                outputs = self.model(encoder_inputs_p,
+                outputs, mean, var = self.model(encoder_inputs_p,
                                      encoder_inputs_v,
                                      encoder_inputs_a,
                                      decoder_inputs,

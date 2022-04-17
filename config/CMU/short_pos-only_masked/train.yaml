@@ -12,7 +12,7 @@ model: net.model.Model
 model_args:
   n_in_enc: 3
   n_hid_enc: 256
-  n_in_dec: 3
+  n_in_dec: 9
   n_hid_dec: 256
   fusion_layer: 2
   cross_w: 0.3
