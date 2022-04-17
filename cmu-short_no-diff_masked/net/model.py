@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import numpy as np
 from net.utils.graph import Graph_J, Graph_P, Graph_B
 from net.utils.module import *
 from net.utils.operation import PartLocalInform, BodyLocalInform
@@ -59,6 +59,31 @@ class Model(nn.Module):
         pred = self.decoder(dec_curr, dec_prev, dec_prev2, hidden, t)
         return pred
 
+    @staticmethod
+    def cal_gauss_log_lik_per_datapoint(x, mu, log_var=0.0):
+        """
+        :param x: batch of inputs (bn X fn)
+        :return: gaussian log likelihood, and the mean squared error
+        """
+        MSE = torch.pow((mu - x), 2)
+        gauss_log_lik = -0.5*(log_var + np.log(2*np.pi) + (MSE/(1e-8 + torch.exp(log_var))))
+        MSE = torch.sum(MSE, axis=1)
+        gauss_log_lik = torch.sum(gauss_log_lik, axis=1)
+
+        return torch.mean(gauss_log_lik, axis=1), MSE
+    
+    @torch.no_grad()
+    def cal_posterior(self, enc_p, enc_v, enc_a, dec_curr, dec_prev, dec_prev2,
+                t, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p=1):
+        
+        mean, log_var = self.encoder_pos(enc_p, relrec_s1, relsend_s1, relrec_s2, relsend_s2, relrec_s3, relsend_s3, lamda_p)
+        latent_var = self.reparameterization(mean, torch.exp(0.5 * log_var))
+        
+        print(mean.size())
+        posterior, _ = self.cal_gauss_log_lik_per_datapoint(mean, torch.zeros_like(mean), log_var=torch.zeros_like(mean))
+
+        return posterior
+
 class Encoder(nn.Module):
 
     def __init__(self, n_in_enc, graph_args_j, graph_args_p, graph_args_b, edge_weighting, fusion_layer, cross_w, hidden_dim=256, **kwargs):
@@ -85,7 +110,8 @@ class Encoder(nn.Module):
         self.s1_l2 = St_gcn(32, 64, ksize_1, stride=2, **kwargs)
         self.s1_l3 = St_gcn(64, 128, ksize_1, stride=2, **kwargs)
         self.s1_l4 = St_gcn(128, 256, ksize_1, stride=2, **kwargs)
-        self.s1_l5 = St_gcn(256, 256, ksize_1, stride=1, **kwargs)
+        self.s1_l5 = St_gcn(256, 256, ksize_1, stride=2, **kwargs)
+
         self.s2_l1 = St_gcn(n_in_enc, 32, ksize_2, stride=1, residual=False, **kwargs)
         self.s2_l2 = St_gcn(32, 64, ksize_2, stride=2, **kwargs)
         self.s2_l3 = St_gcn(64, 128, ksize_2, stride=2, **kwargs)
@@ -132,6 +158,16 @@ class Encoder(nn.Module):
             self.eadd_s2 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_p.size())) for i in range(4)])
             self.emul_s3 = [1]*4
             self.eadd_s3 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_b.size())) for i in range(4)])
+
+        
+        padding = ((ksize_1[0]-1)//2, 0)
+        stri = 1
+        self.temp_pool = nn.Sequential(nn.BatchNorm2d(256),
+                                 nn.ReLU(inplace=True),
+                                 nn.Conv2d(256, 256, (ksize_1[0], 1), (stri, 1), padding),
+                                 nn.BatchNorm2d(256),
+                                 nn.Dropout(0.3, inplace=True))
+        self.relu = nn.ReLU()
 
         self.FC_mean  = nn.Linear(hidden_dim, hidden_dim)
         self.FC_var   = nn.Linear(hidden_dim, hidden_dim)
@@ -230,7 +266,12 @@ class Encoder(nn.Module):
         x_s21 = self.s2_back(x_s2_4)
         x_s31 = self.s3_back(x_s3_4)
         x_s1_5 = x_s1_4+lamda_p*x_s21+lamda_p*x_s31
-        x_hidden = torch.mean(self.s1_l5(x_s1_5, self.A_j*self.emul_s1[4]+self.eadd_s1[4]), dim=2)
+        x_pre_hidden = self.s1_l5(x_s1_5, self.A_j*self.emul_s1[4]+self.eadd_s1[4])
+
+        x_t = self.temp_pool(x_pre_hidden) # 4->4
+        x_t = self.relu(x_t)
+
+        x_hidden = torch.mean(x_t, dim=2)
         # x_out = self.hidden(x_hidden)
         x_out = x_hidden
 		
