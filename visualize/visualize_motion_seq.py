@@ -220,5 +220,7 @@ if __name__ == '__main__':
     visualize_input(input_poses_4d, intput_frames_to_vis, args.img_dir)
 
     # visualize output vs target
-    output_frames_to_vis = [i for i in range(0, 5, 2)]
+    # amass
+    # output_frames_to_vis = [i for i in range(0, 5, 2)]
+    output_frames_to_vis = [0, 5, 9]
     visualize_target_and_output(target_poses_4d, output_poses_4d, output_frames_to_vis, args.img_dir)
