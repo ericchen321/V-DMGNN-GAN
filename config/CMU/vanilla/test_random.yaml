@@ -8,7 +8,7 @@ batch_size: 32
 source_seq_len: 50
 target_seq_len: 10
 
-masking_type: lower-body
+masking_type: random
 model: net.model.Model
 model_args:
   n_in_enc: 3
@@ -38,4 +38,4 @@ fusion_layer_dir: test
 learning_rate_dir: test
 lamda_dir: test
 crossw_dir: test
-note: lower-body
+note: random
