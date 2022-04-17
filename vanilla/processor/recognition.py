@@ -144,7 +144,7 @@ class REC_Processor(Processor):
         M_dec_in = np.random.binomial(n=1, p=p, size=decoder_inputs.shape).astype(np.float32)
         return M_enc_in, M_dec_in
     
-    def train(self, masking_type="lower_body"):
+    def train(self, masking_type="lower-body"):
         self.model.train()
         self.adjust_lr()
         loss_value = []
@@ -156,7 +156,7 @@ class REC_Processor(Processor):
                                                                self.arg.target_seq_len, 
                                                                len(self.dim_use))
         #build masking matrices
-        if masking_type == "lower_body":
+        if masking_type == "lower-body":
             self.M_enc_in, self.M_dec_in = self.build_lower_body_masking_matrices(
                 self.lower_body_joints,
                 encoder_inputs,
@@ -231,7 +231,7 @@ class REC_Processor(Processor):
         self.epoch_info['mean_loss']= np.mean(loss_value)
 
 
-    def test(self, evaluation=True, iter_time=0, save_motion=False, phase=False, masking_type="lower_body"):
+    def test(self, evaluation=True, iter_time=0, save_motion=False, phase=False, masking_type="lower-body"):
 
         self.model.eval()
         loss_value = []
@@ -252,7 +252,7 @@ class REC_Processor(Processor):
                                                                   len(self.dim_use))
 
             #build masking matrices
-            if masking_type == "lower_body":
+            if masking_type == "lower-body":
                 self.M_enc_in, self.M_dec_in = self.build_lower_body_masking_matrices(
                     self.lower_body_joints,
                     encoder_inputs,

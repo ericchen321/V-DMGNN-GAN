@@ -178,7 +178,7 @@ class Processor(IO):
         parser.add_argument('--target_seq_len', type=int, default=25, help='which Top K accuracy will be shown')
 
         # model
-        parser.add_argument('--masking_type', default='lower_body', help='lower_body or random')
+        parser.add_argument('--masking_type', default='lower-body', help='lower-body or random')
         parser.add_argument('--model', default=None, help='the model will be used')
         parser.add_argument('--model_args', action=DictAction, default=dict(), help='the arguments of model')
         parser.add_argument('--edge_weighting', type=bool, default=True, help='Add edge importance weighting')

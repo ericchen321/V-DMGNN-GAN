@@ -1,5 +1,5 @@
 work_dir: './work_dir/prediction'
-weights: './work_dir/prediction/fusion_2/adam_1e-4/lamda_06/cross_03/test/iter40000_model.pt'
+weights: './work_dir/prediction/fusion_2/adam_1e-4/lamda_06/cross_03/test/iter30000_model.pt'
 train_dir: '../data/cmu/train'
 test_dir: '../data/cmu/test'
 
@@ -8,6 +8,7 @@ batch_size: 32
 source_seq_len: 50
 target_seq_len: 10
 
+masking_type: lower_body
 model: net.model.Model
 model_args:
   n_in_enc: 3
