@@ -235,8 +235,7 @@ class REC_Processor(Processor):
 
         self.model.eval()
         loss_value = []
-        normed_test_dict = normalize_data(
-            self.test_dict, self.data_mean, self.data_std, self.dim_use, masking_type="lower_body")
+        normed_test_dict = normalize_data(self.test_dict, self.data_mean, self.data_std, self.dim_use)
         self.actions = ["basketball", "basketball_signal", "directing_traffic", 
                    "jumping", "running", "soccer", "walking", "washwindow"]
 
