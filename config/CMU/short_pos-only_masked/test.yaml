@@ -8,6 +8,7 @@ batch_size: 32
 source_seq_len: 50
 target_seq_len: 10
 
+masking_type: lower_body
 model: net.model.Model
 model_args:
   n_in_enc: 3

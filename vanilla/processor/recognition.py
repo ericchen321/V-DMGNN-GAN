@@ -124,7 +124,7 @@ class REC_Processor(Processor):
         M = np.multiply(M, inverted_mask_matrix)
         return M
     
-    def build_lower_body_masking_matrices(self, lower_body_joints, encoder_inputs, decoder_inputs, targets):
+    def build_lower_body_masking_matrices(self, lower_body_joints, encoder_inputs, decoder_inputs):
         # build encoder input mask
         M_enc_in = self.build_masking_matrix(encoder_inputs, lower_body_joints)
         # build decoder input mask
@@ -144,7 +144,7 @@ class REC_Processor(Processor):
         M_dec_in = np.random.binomial(n=1, p=p, size=decoder_inputs.shape).astype(np.float32)
         return M_enc_in, M_dec_in
     
-    def train(self):
+    def train(self, masking_type="lower_body"):
         self.model.train()
         self.adjust_lr()
         loss_value = []
@@ -155,17 +155,21 @@ class REC_Processor(Processor):
                                                                self.arg.source_seq_len, 
                                                                self.arg.target_seq_len, 
                                                                len(self.dim_use))
-        #build lower-body masking matrices
-        # self.M_enc_in, self.M_dec_in = self.build_lower_body_masking_matrices(
-        #     self.lower_body_joints,
-        #     encoder_inputs,
-        #     decoder_inputs
-        # )
-        self.M_enc_in, self.M_dec_in = self.build_random_masking_matrices(
-            encoder_inputs,
-            decoder_inputs,
-            p=0.8
-        )
+        #build masking matrices
+        if masking_type == "lower_body":
+            self.M_enc_in, self.M_dec_in = self.build_lower_body_masking_matrices(
+                self.lower_body_joints,
+                encoder_inputs,
+                decoder_inputs
+            )
+        elif masking_type == "random":
+            self.M_enc_in, self.M_dec_in = self.build_random_masking_matrices(
+                encoder_inputs,
+                decoder_inputs,
+                p=0.8
+            )
+        else:
+            raise NotImplementedError
         
         #mask encoder inputs and decoder inputs
         encoder_inputs = np.multiply(self.M_enc_in, encoder_inputs)
@@ -227,11 +231,12 @@ class REC_Processor(Processor):
         self.epoch_info['mean_loss']= np.mean(loss_value)
 
 
-    def test(self, evaluation=True, iter_time=0, save_motion=False, phase=False):
+    def test(self, evaluation=True, iter_time=0, save_motion=False, phase=False, masking_type="lower_body"):
 
         self.model.eval()
         loss_value = []
-        normed_test_dict = normalize_data(self.test_dict, self.data_mean, self.data_std, self.dim_use)
+        normed_test_dict = normalize_data(
+            self.test_dict, self.data_mean, self.data_std, self.dim_use, masking_type="lower_body")
         self.actions = ["basketball", "basketball_signal", "directing_traffic", 
                    "jumping", "running", "soccer", "walking", "washwindow"]
 
@@ -247,17 +252,21 @@ class REC_Processor(Processor):
                                                                   self.arg.target_seq_len, 
                                                                   len(self.dim_use))
 
-            #build lower-body masking matrices
-            # self.M_enc_in, self.M_dec_in = self.build_lower_body_masking_matrices(
-            #     self.lower_body_joints,
-            #     encoder_inputs,
-            #     decoder_inputs
-            # )
-            self.M_enc_in, self.M_dec_in = self.build_random_masking_matrices(
-                encoder_inputs,
-                decoder_inputs,
-                p=0.8
-            )
+            #build masking matrices
+            if masking_type == "lower_body":
+                self.M_enc_in, self.M_dec_in = self.build_lower_body_masking_matrices(
+                    self.lower_body_joints,
+                    encoder_inputs,
+                    decoder_inputs
+                )
+            elif masking_type == "random":
+                self.M_enc_in, self.M_dec_in = self.build_random_masking_matrices(
+                    encoder_inputs,
+                    decoder_inputs,
+                    p=0.8
+                )
+            else:
+                raise NotImplementedError
 
             #mask encoder inputs and decoder inputs
             encoder_inputs = np.multiply(self.M_enc_in, encoder_inputs)
