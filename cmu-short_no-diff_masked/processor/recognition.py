@@ -26,7 +26,6 @@ from torch.distributions.uniform import Uniform
 
 
 
-
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv1d') != -1:
@@ -100,7 +99,7 @@ class REC_Processor(Processor):
                                         weight_decay=self.arg.weight_decay)
 
         self.netD_optimizer =optim.Adam(params=self.discriminator.parameters(),
-                                        lr=0.000005,
+                                        lr=0.000004,
                                         weight_decay=self.arg.weight_decay)
 
 
@@ -295,6 +294,7 @@ class REC_Processor(Processor):
 
         self.show_iter_info()
         self.meta_info['iter'] += 1
+        # writer.add_scalar("Loss/train", loss, epoch)
 
 
 
@@ -353,11 +353,12 @@ class REC_Processor(Processor):
         errD = 0.5*(errD_real + errD_fake)
         errD.backward()
         self.netD_optimizer.step()
+        nn.utils.clip_grad_norm_(self.discriminator.parameters(), 0.1)
         D_x_real = dis_oreal.mean().item()
 
 
 
-        self.iter_info['discriminator loss'] = errD
+        self.iter_info['discriminator_loss'] = errD
         self.iter_info['discriminator real out'] = D_x_real
         self.iter_info['discriminator fake out'] = D_x_fake
         self.iter_info['discriminator real loss'] = errD_real
@@ -491,13 +492,16 @@ class REC_Processor(Processor):
                 real_labels = real_labels.expand_as(gen_disco).cuda()
                 # print(real_labels.requires_grad)
                 gan_loss = self.criterion(gen_disco, real_labels)
-                loss = 0.95* loss + 0.05*gan_loss
+                loss = 0.97* loss + 0.03*gan_loss
         
 
 
             self.optimizer.zero_grad()
             loss.backward()
-            nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
+            # Clip weights of discriminator
+            for p in self.discriminator.parameters():
+                p.data.clamp_(-0.25, 0.25)
+            # nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
             self.optimizer.step()
 
             self.iter_info['loss'] = loss.data.item()
