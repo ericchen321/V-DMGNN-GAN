@@ -17,6 +17,10 @@ from .data_tools import *
 # import data_tools as tools
 
 
+from torch.utils.tensorboard import SummaryWriter
+
+
+
 class Processor(IO):
 
     def __init__(self, argv=None):
@@ -29,13 +33,14 @@ class Processor(IO):
         self.load_data()
         self.load_optimizer()
 
+
     def init_environment(self):
         super().init_environment()
         self.result = dict()
         self.iter_info = dict()
         self.epoch_info = dict()
         self.meta_info = dict(epoch=0, iter=0)
-
+        self.writer = SummaryWriter()
 
     def load_optimizer(self):
         pass
@@ -58,6 +63,8 @@ class Processor(IO):
             self.io.log('train', self.meta_info['iter'], self.epoch_info)
 
 
+
+
     def show_iter_info(self):
         if self.meta_info['iter'] % self.arg.log_interval == 0:
             info ='\tIter {} Done.'.format(self.meta_info['iter'])
@@ -66,10 +73,15 @@ class Processor(IO):
                     info = info + ' | {}: {:.4f}'.format(k, v)
                 else:
                     info = info + ' | {}: {}'.format(k, v)
+                if k in ['loss', 'discriminator loss']:
+                    self.writer.add_scalar('check_info/'+k, v, self.meta_info['iter'])
+                else:
+                    self.writer.add_scalar(k, v, self.meta_info['iter'])
             self.io.print_log(info)
 
             if self.arg.pavi_log:
                 self.io.log('train', self.meta_info['iter'], self.iter_info)
+
 
 
     def train(self):
@@ -136,6 +148,7 @@ class Processor(IO):
             self.io.print_log('Evaluation Start:')
             self.test(phase=True, save_motion=self.arg.save_motion)
 
+        self.writer.flush()
 
     @staticmethod
     def get_parser(add_help=False):
