@@ -100,7 +100,7 @@ class REC_Processor(Processor):
                                         weight_decay=self.arg.weight_decay)
 
         self.netD_optimizer =optim.Adam(params=self.discriminator.parameters(),
-                                        lr=0.000008,
+                                        lr=0.000005,
                                         weight_decay=self.arg.weight_decay)
 
 
@@ -491,7 +491,7 @@ class REC_Processor(Processor):
                 real_labels = real_labels.expand_as(gen_disco).cuda()
                 # print(real_labels.requires_grad)
                 gan_loss = self.criterion(gen_disco, real_labels)
-                loss = 0.9* loss + 0.1*gan_loss
+                loss = 0.95* loss + 0.05*gan_loss
         
 
 

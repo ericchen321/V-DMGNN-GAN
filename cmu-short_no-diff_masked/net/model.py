@@ -833,7 +833,7 @@ class Discriminatorv3(nn.Module):
 
         # post processing
         self.gcn = SpatialConv(256, 128, 2, 1)
-
+        self.leaky_relu_post = nn.LeakyReLU(negative_slope=0.2)
         self.emul_s1 = nn.ParameterList([nn.Parameter(torch.ones(self.A_j.size())) for i in range(1)])
         self.eadd_s1 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_j.size())) for i in range(1)])
         '''
@@ -958,8 +958,9 @@ class Discriminatorv3(nn.Module):
         # reses = torch.stack(res_all, dim=1)
         # preds = preds * self.mask
         out = self.gcn(hiddens[-1].unsqueeze(2), self.A_j*self.emul_s1[0]+self.eadd_s1[0])# .squeeze(2)
-        out = self.relu(out)
+        out = self.leaky_relu_post(out)# self.relu(out)
         out = self.fcn(out)
+        out = self.leaky_relu_post(out)
         output = out.view(N,-1)
         output = self.post_layer(output)
 
