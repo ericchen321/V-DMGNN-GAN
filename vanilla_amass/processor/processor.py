@@ -128,7 +128,7 @@ class Processor(IO):
         if self.arg.phase == 'train':
             # self.MAE_tensor = np.zeros((self.arg.iter_num // self.arg.eval_interval, 8, 13))
             # Hard Code: Hard code the values for now, 15 classes for ACCAD (leave 30 here for num_actions)
-            self.MAE_tensor = np.zeros((self.arg.iter_num // self.arg.eval_interval, 30, 13))
+            self.MAE_tensor = np.zeros((self.arg.iter_num // self.arg.eval_interval, 15, 4))
 
             self.mask = torch.ones(25).to(self.dev)
             self.mask[10:] = 2
@@ -148,7 +148,7 @@ class Processor(IO):
                         save_motion=self.arg.save_motion,
                         masking_type=self.arg.masking_type)
             self.MAE = self.MAE_tensor.min(axis=0)
-            self.MAE[:,-1] = self.MAE.mean(axis=-1)*13/10.
+            self.MAE[:,-1] = self.MAE.mean(axis=-1)*4/10.
 
             print_str = "{0: <16} |".format("milliseconds")
             for ms in [41.65, 241.57, 399.84]:
