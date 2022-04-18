@@ -138,5 +138,3 @@ motion_*/
 # amass dataset
 amass/ACCAD/
 amass/SFU/
-data/accad/train/
-data/accad/test/
