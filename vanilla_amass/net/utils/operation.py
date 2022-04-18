@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# Note: The following class is modified for AMASS dataset
+#       Ignore 22 and above, 0:21 are the body pose joints
+# https://www.codetd.com/en/article/11819052
 
 class Mlp_JpTrans(nn.Module):
 
@@ -58,33 +61,36 @@ class Mlp_JpTrans(nn.Module):
 class PartLocalInform(nn.Module):
 
     def __init__(self):
+        """
+        https://www.codetd.com/en/article/11819052
+        """
         super().__init__()
 
-        self.torso = [8,9,10]
-        self.left_leg_up = [0,1]
-        self.left_leg_down = [2,3]
-        self.right_leg_up = [4,5]
-        self.right_leg_down = [6,7]
-        self.head = [11,12,13]
-        self.left_arm_up = [14,15]
-        self.left_arm_down = [16,17,18,19]
-        self.right_arm_up = [20,21]
-        self.right_arm_down = [22,23,24,25]
+        self.torso = [0, 3, 6, 9]
+        self.left_leg_up = [1, 4]
+        self.left_leg_down = [7, 10]
+        self.right_leg_up = [2, 5]
+        self.right_leg_down = [8, 11]
+        self.head = [12, 15]
+        self.left_arm_up = [13, 16]
+        self.left_arm_down = [18, 20]
+        self.right_arm_up = [14, 17]
+        self.right_arm_down = [19, 21]
 
     def forward(self, part):
         N, d, T, w = part.size()  # [64, 256, 7, 10]
-        x = part.new_zeros((N, d, T, 26))
+        x = part.new_zeros((N, d, T, 22))
 
         x[:,:,:,self.left_leg_up] = torch.cat((part[:,:,:,0].unsqueeze(-1), part[:,:,:,0].unsqueeze(-1)),-1)
         x[:,:,:,self.left_leg_down] = torch.cat((part[:,:,:,1].unsqueeze(-1), part[:,:,:,1].unsqueeze(-1)),-1)
         x[:,:,:,self.right_leg_up] = torch.cat((part[:,:,:,2].unsqueeze(-1), part[:,:,:,2].unsqueeze(-1)),-1)
         x[:,:,:,self.right_leg_down] = torch.cat((part[:,:,:,3].unsqueeze(-1), part[:,:,:,3].unsqueeze(-1)),-1)
-        x[:,:,:,self.torso] = torch.cat((part[:,:,:,4].unsqueeze(-1), part[:,:,:,4].unsqueeze(-1), part[:,:,:,4].unsqueeze(-1)),-1)
-        x[:,:,:,self.head] = torch.cat((part[:,:,:,5].unsqueeze(-1), part[:,:,:,5].unsqueeze(-1), part[:,:,:,5].unsqueeze(-1)),-1)
+        x[:,:,:,self.torso] = torch.cat((part[:,:,:,4].unsqueeze(-1), part[:,:,:,4].unsqueeze(-1), part[:,:,:,4].unsqueeze(-1), part[:,:,:,4].unsqueeze(-1)),-1)
+        x[:,:,:,self.head] = torch.cat((part[:,:,:,5].unsqueeze(-1), part[:,:,:,5].unsqueeze(-1)),-1)
         x[:,:,:,self.left_arm_up] = torch.cat((part[:,:,:,6].unsqueeze(-1),part[:,:,:,6].unsqueeze(-1)),-1)
-        x[:,:,:,self.left_arm_down] = torch.cat((part[:,:,:,7].unsqueeze(-1), part[:,:,:,7].unsqueeze(-1), part[:,:,:,7].unsqueeze(-1), part[:,:,:,7].unsqueeze(-1)),-1)
+        x[:,:,:,self.left_arm_down] = torch.cat((part[:,:,:,7].unsqueeze(-1), part[:,:,:,7].unsqueeze(-1)),-1)
         x[:,:,:,self.right_arm_up] = torch.cat((part[:,:,:,8].unsqueeze(-1), part[:,:,:,8].unsqueeze(-1)),-1)
-        x[:,:,:,self.right_arm_down] = torch.cat((part[:,:,:,9].unsqueeze(-1), part[:,:,:,9].unsqueeze(-1), part[:,:,:,9].unsqueeze(-1), part[:,:,:,9].unsqueeze(-1)),-1)
+        x[:,:,:,self.right_arm_down] = torch.cat((part[:,:,:,9].unsqueeze(-1), part[:,:,:,9].unsqueeze(-1)),-1)
 
         return x
 
@@ -92,23 +98,32 @@ class PartLocalInform(nn.Module):
 class BodyLocalInform(nn.Module):
 
     def __init__(self):
+        """
+        https://www.codetd.com/en/article/11819052
+        """
         super().__init__()
 
-        self.torso = [8,9,10,11,12,13]
-        self.left_leg = [0,1,2,3]
-        self.right_leg = [4,5,6,7]
-        self.left_arm = [14,15,16,17,18,19]
-        self.right_arm = [20,21,22,23,24,25]
+        # self.torso = [8,9,10,11,12,13]
+        # self.left_leg = [0,1,2,3]
+        # self.right_leg = [4,5,6,7]
+        # self.left_arm = [14,15,16,17,18,19]
+        # self.right_arm = [20,21,22,23,24,25]
+
+        self.torso = [0, 3, 6, 9, 12, 15]
+        self.left_leg = [1, 4, 7, 10]
+        self.right_leg = [2, 5, 8, 11]
+        self.left_arm = [13, 16, 18, 20]
+        self.right_arm = [14, 17, 19, 21]
 
     def forward(self, body):
         N, d, T, w = body.size()  # [64, 256, 7, 10]
-        x = body.new_zeros((N, d, T, 26))
+        x = body.new_zeros((N, d, T, 22))
 
         x[:,:,:,self.left_leg] = torch.cat((body[:,:,:,0:1], body[:,:,:,0:1], body[:,:,:,0:1], body[:,:,:,0:1]),-1)
-        x[:,:,:,self.right_leg] = torch.cat((body[:,:,:,1:2], body[:,:,:,1:2], body[:,:,:,1:2], body[:,:,:,2:3]),-1)
+        x[:,:,:,self.right_leg] = torch.cat((body[:,:,:,1:2], body[:,:,:,1:2], body[:,:,:,1:2], body[:,:,:,1:2]),-1)
         x[:,:,:,self.torso] = torch.cat((body[:,:,:,2:3], body[:,:,:,2:3], body[:,:,:,2:3], body[:,:,:,2:3], body[:,:,:,2:3], body[:,:,:,2:3]),-1)
-        x[:,:,:,self.left_arm] = torch.cat((body[:,:,:,3:4], body[:,:,:,3:4], body[:,:,:,3:4], body[:,:,:,3:4], body[:,:,:,3:4], body[:,:,:,3:4]),-1)
-        x[:,:,:,self.right_arm] = torch.cat((body[:,:,:,4:5], body[:,:,:,4:5], body[:,:,:,4:5], body[:,:,:,4:5], body[:,:,:,4:5], body[:,:,:,4:5]),-1)
+        x[:,:,:,self.left_arm] = torch.cat((body[:,:,:,3:4], body[:,:,:,3:4], body[:,:,:,3:4], body[:,:,:,3:4]),-1)
+        x[:,:,:,self.right_arm] = torch.cat((body[:,:,:,4:5], body[:,:,:,4:5], body[:,:,:,4:5], body[:,:,:,4:5]),-1)
 
         return x
         

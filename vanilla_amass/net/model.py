@@ -237,9 +237,9 @@ class Decoder(nn.Module):
         self.relu = nn.ReLU()
         self.leaky_relu = nn.LeakyReLU(negative_slope=0.1)
 
-        self.mask = torch.ones(78).cuda().detach()
-        self.zero_idx = torch.tensor([5, 11, 17, 23, 45, 49, 50,54, 55, 63, 67, 68 ,72, 73]).cuda().detach()
-        self.mask[self.zero_idx] = 0.
+        #self.mask = torch.ones(78).cuda().detach()
+        #self.zero_idx = torch.tensor([5, 11, 17, 23, 45, 49, 50,54, 55, 63, 67, 68 ,72, 73]).cuda().detach()
+        #self.mask[self.zero_idx] = 0.
 
     def step_forward(self, x, hidden, step):                     # inputs: [64, 21, 3]; hidden: [64, 256, 21]=N, hid, V
         N, V, d = x.size()  # NOTE by Eric: d should be 9, not 3 (as suggested above) if we're using the 1- and 2-difference
@@ -271,7 +271,7 @@ class Decoder(nn.Module):
         inputs = inputs.contiguous().view(N, T, self.V, -1)                        # [64, 1, 21, 3]
         inputs_previous = inputs_previous.contiguous().view(N, T, self.V, -1)
         inputs_previous2 = inputs_previous2.contiguous().view(N, T, self.V, -1)
-        self.mask = self.mask.view(self.V, 3)
+        #self.mask = self.mask.view(self.V, 3)
 
         for step in range(0, t):
             # NOTE by Eric: t=1 by default (get_parser() in recognition.py)
@@ -304,6 +304,7 @@ class Decoder(nn.Module):
 
         preds = torch.stack(pred_all, dim=1)                                       # [64, t, 21, 3]
         reses = torch.stack(res_all, dim=1)
-        preds = preds * self.mask
+        # NOTE by Eric: remove the mysterious mask
+        #preds = preds * self.mask
        
         return preds.transpose(1, 2).contiguous()      # [64, 21, t, 3]

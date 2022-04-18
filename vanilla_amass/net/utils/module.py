@@ -94,28 +94,28 @@ class AveargeJoint(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.torso = [8,9,10]
-        self.left_leg_up = [0,1]
-        self.left_leg_down = [2,3]
-        self.right_leg_up = [4,5]
-        self.right_leg_down = [6,7]
-        self.head = [11,12,13]
-        self.left_arm_up = [14,15]
-        self.left_arm_down = [16,17,18,19]
-        self.right_arm_up = [20,21]
-        self.right_arm_down = [22,23,24,25]
+        self.torso = [0, 3, 6, 9]
+        self.left_leg_up = [1, 4]
+        self.left_leg_down = [7, 10]
+        self.right_leg_up = [2, 5]
+        self.right_leg_down = [8, 11]
+        self.head = [12, 15]
+        self.left_arm_up = [13, 16]
+        self.left_arm_down = [18, 20]
+        self.right_arm_up = [14, 17]
+        self.right_arm_down = [19, 21]
         
     def forward(self, x):
-        x_torso = F.avg_pool2d(x[:, :, :, self.torso], kernel_size=(1, 3))                                              # [N, C, T, V=1]
+        x_torso = F.avg_pool2d(x[:, :, :, self.torso], kernel_size=(1, 4))                                              # [N, C, T, V=1]
         x_leftlegup = F.avg_pool2d(x[:, :, :, self.left_leg_up], kernel_size=(1, 2))                                # [N, C, T, V=1]
         x_leftlegdown = F.avg_pool2d(x[:, :, :, self.left_leg_down], kernel_size=(1, 2))                     # [N, C, T, V=1]
         x_rightlegup = F.avg_pool2d(x[:, :, :, self.right_leg_up], kernel_size=(1, 2))                        # [N, C, T, V=1]
         x_rightlegdown = F.avg_pool2d(x[:, :, :, self.right_leg_down], kernel_size=(1, 2))                   # [N, C, T, V=1]
-        x_head = F.avg_pool2d(x[:, :, :, self.head], kernel_size=(1, 3))                                              # [N, C, T, V=1]
+        x_head = F.avg_pool2d(x[:, :, :, self.head], kernel_size=(1, 2))                                              # [N, C, T, V=1]
         x_leftarmup = F.avg_pool2d(x[:, :, :, self.left_arm_up], kernel_size=(1, 2))                            # [N, C, T, V=1]
-        x_leftarmdown = F.avg_pool2d(x[:, :, :, self.left_arm_down], kernel_size=(1, 4))                 # [N, C, T, V=1]
+        x_leftarmdown = F.avg_pool2d(x[:, :, :, self.left_arm_down], kernel_size=(1, 2))                 # [N, C, T, V=1]
         x_rightarmup = F.avg_pool2d(x[:, :, :, self.right_arm_up], kernel_size=(1, 2))                        # [N, C, T, V=1]
-        x_rightarmdown = F.avg_pool2d(x[:, :, :, self.right_arm_down], kernel_size=(1, 4))               # [N, C, T, V=1]
+        x_rightarmdown = F.avg_pool2d(x[:, :, :, self.right_arm_down], kernel_size=(1, 2))               # [N, C, T, V=1]
         x_part = torch.cat((x_leftlegup, x_leftlegdown, x_rightlegup, x_rightlegdown, x_torso, x_head, x_leftarmup, x_leftarmdown, x_rightarmup, x_rightarmdown), dim=-1)               # [N, C, T, V=1]), dim=-1)        # [N, C, T, 10]
         return x_part
 
@@ -125,18 +125,18 @@ class AveargePart(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.torso = [8,9,10,11,12,13]
-        self.left_leg = [0,1,2,3]
-        self.right_leg = [4,5,6,7]
-        self.left_arm = [14,15,16,17,18,19]
-        self.right_arm = [20,21,22,23,24,25]
+        self.torso = [0, 3, 6, 9, 12, 15]
+        self.left_leg = [1, 4, 7, 10]
+        self.right_leg = [2, 5, 8, 11]
+        self.left_arm = [13, 16, 18, 20]
+        self.right_arm = [14, 17, 19, 21]
         
     def forward(self, x):
         x_torso = F.avg_pool2d(x[:, :, :, self.torso], kernel_size=(1, 6))                                              # [N, C, T, V=1]
         x_leftleg = F.avg_pool2d(x[:, :, :, self.left_leg], kernel_size=(1, 4))                                # [N, C, T, V=1]
         x_rightleg = F.avg_pool2d(x[:, :, :, self.right_leg], kernel_size=(1, 4))                        # [N, C, T, V=1]
-        x_leftarm = F.avg_pool2d(x[:, :, :, self.left_arm], kernel_size=(1, 6))                            # [N, C, T, V=1]
-        x_rightarm = F.avg_pool2d(x[:, :, :, self.right_arm], kernel_size=(1, 6))                        # [N, C, T, V=1]
+        x_leftarm = F.avg_pool2d(x[:, :, :, self.left_arm], kernel_size=(1, 4))                            # [N, C, T, V=1]
+        x_rightarm = F.avg_pool2d(x[:, :, :, self.right_arm], kernel_size=(1, 4))                        # [N, C, T, V=1]
         x_body = torch.cat((x_leftleg, x_rightleg, x_torso, x_leftarm, x_rightarm), dim=-1)               # [N, C, T, V=1]), dim=-1)        # [N, C, T, 10]
         return x_body
 

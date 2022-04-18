@@ -2,15 +2,13 @@ train_dir: '../data/accad/train/'
 test_dir: '../data/accad/test/'
 work_dir: './work_dir/prediction'
 
-#train_dir: 'D:/Documents/DMGNN-master-Copy/data/accad/train/'
-#test_dir: 'D:/Documents/DMGNN-master-Copy/data/accad/test/'
-
 actions: 'all'
 batch_size: 32
 source_seq_len: 50
-target_seq_len: 10
-        
+target_seq_len: 50
 
+
+masking_type: random
 model: net.model.Model
 model_args:
   n_in_enc: 3
@@ -31,7 +29,6 @@ model_args:
 edge_weighting: True
 
 
-#iter_num: 300
 iter_num: 40000
 weight_decay: 0.0001
 optimizer: 'Adam'
@@ -43,11 +40,14 @@ base_lr: 0.00005
 use_gpu: True
 device: [1]
 
+eval_interval: 1000
+save_interval: 5000
+
 lamda: 0.6
 fusion_layer_dir: fusion_2
 learning_rate_dir: adam_1e-4
 lamda_dir: lamda_06
 crossw_dir: cross_03
-note: test
+note: random
 
 debug: False

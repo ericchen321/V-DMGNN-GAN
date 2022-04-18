@@ -42,7 +42,9 @@ class REC_Processor(Processor):
     def load_model(self):
         self.model = self.io.load_model(self.arg.model, **(self.arg.model_args))
         self.model.apply(weights_init)
-        V, W, U = 26, 10, 5
+        # Note: for AMASS dataset, we have 22 joints rather than 26, and W, U represent scale of body-joint
+        # V, W, U = 26, 10, 5
+        V, W, U = 22, 10, 5
         off_diag_joint, off_diag_part, off_diag_body = np.ones([V, V])-np.eye(V, V), np.ones([W, W])-np.eye(W, W), np.ones([U, U])-np.eye(U, U)
         self.relrec_joint = torch.FloatTensor(np.array(encode_onehot(np.where(off_diag_joint)[1]), dtype=np.float32)).to(self.dev)
         self.relsend_joint = torch.FloatTensor(np.array(encode_onehot(np.where(off_diag_joint)[0]), dtype=np.float32)).to(self.dev)
@@ -50,7 +52,7 @@ class REC_Processor(Processor):
         self.relsend_part = torch.FloatTensor(np.array(encode_onehot(np.where(off_diag_part)[0]), dtype=np.float32)).to(self.dev)
         self.relrec_body = torch.FloatTensor(np.array(encode_onehot(np.where(off_diag_body)[1]), dtype=np.float32)).to(self.dev)
         self.relsend_body = torch.FloatTensor(np.array(encode_onehot(np.where(off_diag_body)[0]), dtype=np.float32)).to(self.dev)
-        self.lower_body_joints = [1, 2, 3]
+        self.lower_body_joints = [4, 7, 10]
         
     def load_optimizer(self):
         if self.arg.optimizer == 'SGD':
@@ -236,13 +238,30 @@ class REC_Processor(Processor):
         self.model.eval()
         loss_value = []
         normed_test_dict = normalize_data(self.test_dict, self.data_mean, self.data_std, self.dim_use)
-        self.actions = ["basketball", "basketball_signal", "directing_traffic", 
-                   "jumping", "running", "soccer", "walking", "washwindow"]
+        # self.actions = ["basketball", "basketball_signal", "directing_traffic", 
+        #            "jumping", "running", "soccer", "walking", "washwindow"]
+        self.actions = [
+            "Female1General_c3d",
+            "Female1Gestures_c3d",
+            "Female1Running_c3d",
+            "Female1Walking_c3d",
+            "Male1General_c3d",
+            "Male1Running_c3d",
+            "Male1Walking_c3d",
+            "Male2General_c3d",
+            "Male2MartialArtsExtended_c3d",
+            "Male2MartialArtsKicks_c3d",
+            "Male2MartialArtsPunches_c3d",
+            "Male2MartialArtsStances_c3d",
+            "Male2Running_c3d",
+            "Male2Walking_c3d",
+            "MartialArtsWalksTurns_c3d"
+        ]
 
         self.io.print_log(' ')
         print_str = "{0: <16} |".format("milliseconds")
-        for ms in [40, 80, 120, 160, 200, 240, 280, 320, 360, 400, 560, 1000]:
-            print_str = print_str + " {0:5d} |".format(ms)
+        for ms in [41.65, 241.57, 399.84]:
+            print_str = print_str + " {0:2f} |".format(ms)
         self.io.print_log(print_str)
 
         for action_num, action in enumerate(self.actions):
@@ -353,7 +372,8 @@ class REC_Processor(Processor):
                     t, D = output_denorm.shape
                     output_euler = np.zeros((t,D) , dtype=np.float32)        # [21, 99]
                     for j in np.arange(t):
-                        for k in np.arange(0,115,3):
+                        # for k in np.arange(0,115,3):
+                        for k in np.arange(0,66,3):
                             output_euler[j,k:k+3] = rotmat2euler(expmap2rotmat(output_denorm[j,k:k+3]))
 
                     target = targets[i]
@@ -363,7 +383,8 @@ class REC_Processor(Processor):
                     targets_denorm[i] = target_denorm.reshape((t, -1, 3))
                     target_euler = np.zeros((t,D) , dtype=np.float32)
                     for j in np.arange(t):
-                        for k in np.arange(0,115,3):
+                        # for k in np.arange(0,115,3):
+                        for k in np.arange(0,66,3):
                             target_euler[j,k:k+3] = rotmat2euler(expmap2rotmat(target_denorm[j,k:k+3]))
 
                     target_euler[:,0:6] = 0
@@ -388,7 +409,7 @@ class REC_Processor(Processor):
                     np.save(save_dir+f"/motions_{action}_targets.npy", targets_denorm)
 
                 print_str = "{0: <16} |".format(action)
-                for ms_idx, ms in enumerate([0,1,2,3,4,5,6,7,8,9,13,24]):
+                for ms_idx, ms in enumerate([4, 28, 47]):
                     if self.arg.target_seq_len >= ms+1:
                         print_str = print_str + " {0:.3f} |".format(mean_mean_errors[ms])
                         if phase is not True:

@@ -17,6 +17,35 @@ from .data_tools import *
 # import data_tools as tools
 
 
+import pickle as pkl
+
+
+def load_pkl(dir):
+    """ Load a pkl file as obj """
+    with open(dir, 'rb') as f:
+        obj = pkl.load(f)
+    return obj
+
+
+def save_pkl(obj, dir):
+    """ Save obj as pkl file """
+    f = open(dir, 'wb')
+    pkl.dump(obj, f)
+    f.close()
+
+
+def get_complete_data(data_set):
+    """ Concatenate all key arrays from data_set dict """
+    complete_data = None
+    for key, value in data_set.items():
+        if complete_data is None:
+            complete_data = value
+        else:
+            complete_data = np.vstack((complete_data, value))
+
+    return complete_data
+
+
 class Processor(IO):
 
     def __init__(self, argv=None):
@@ -43,12 +72,16 @@ class Processor(IO):
 
     def load_data(self):
         if self.arg.debug==True:
-            self.actions = define_actions('walking')
+            self.actions = amass_define_actions("Female1General_c3d")
         else:
-            self.actions = define_actions(self.arg.actions)
-        self.train_dict, self.complete_train = load_data(self.arg.train_dir, self.actions)
-        self.test_dict, self.complete_test = load_data(self.arg.test_dir, self.actions)
-        self.data_mean, self.data_std, self.dim_ignore, self.dim_use, self.dim_zero, self.dim_nonzero = normalization_stats(self.complete_train)
+            self.actions = amass_define_actions(self.arg.actions)
+        self.train_dict, self.complete_train = amass_load_data(self.arg.train_dir, self.actions)
+        self.test_dict, self.complete_test = amass_load_data(self.arg.test_dir, self.actions)
+        # ACCAD
+        self.complete_train = get_complete_data(self.train_dict)  # (160458, 156)
+        self.complete_test = get_complete_data(self.test_dict)  # (32095, 156)
+        self.data_mean, self.data_std, self.dim_ignore, self.dim_use, \
+        self.dim_zero, self.dim_nonzero = normalization_stats(self.complete_train)
 
 
     def show_epoch_info(self):
@@ -93,7 +126,10 @@ class Processor(IO):
         self.io.print_log('Parameters:\n{}\n'.format(str(vars(self.arg))))
 
         if self.arg.phase == 'train':
-            self.MAE_tensor = np.zeros((self.arg.iter_num//self.arg.eval_interval, 8, 13))
+            # self.MAE_tensor = np.zeros((self.arg.iter_num // self.arg.eval_interval, 8, 13))
+            # Hard Code: Hard code the values for now, 15 classes for ACCAD (leave 30 here for num_actions)
+            self.MAE_tensor = np.zeros((self.arg.iter_num // self.arg.eval_interval, 30, 13))
+
             self.mask = torch.ones(25).to(self.dev)
             self.mask[10:] = 2
             for itr in range(self.arg.iter_num):
@@ -115,12 +151,12 @@ class Processor(IO):
             self.MAE[:,-1] = self.MAE.mean(axis=-1)*13/10.
 
             print_str = "{0: <16} |".format("milliseconds")
-            for ms in [40, 80, 120, 160, 200, 240, 280, 320, 360, 400, 560, 1000]:
-                print_str = print_str + " {0:5d} |".format(ms)
+            for ms in [41.65, 241.57, 399.84]:
+                print_str = print_str + " {0:2f} |".format(ms)
             self.io.print_log(print_str)
             for idx, action in enumerate(self.actions):
                 print_str = "{0: <16} |".format(action)
-                for ms_idx, ms in enumerate([0,1,2,3,4,5,6,7,8,9,10,11]):
+                for ms_idx, ms in enumerate([4, 28, 47]):
                     if self.arg.target_seq_len >= ms+1:
                         print_str = print_str + " {0:.3f} |".format(self.MAE[idx, ms])
                     else:
