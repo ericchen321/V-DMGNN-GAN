@@ -73,7 +73,7 @@ class Processor(IO):
                     info = info + ' | {}: {:.4f}'.format(k, v)
                 else:
                     info = info + ' | {}: {}'.format(k, v)
-                if k in ['loss', 'discriminator loss']:
+                if k in ['loss', 'discriminator_loss']:
                     self.writer.add_scalar('check_info/'+k, v, self.meta_info['iter'])
                 else:
                     self.writer.add_scalar(k, v, self.meta_info['iter'])

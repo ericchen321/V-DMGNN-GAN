@@ -457,7 +457,7 @@ class REC_Processor(Processor):
             
             if True:
                 disc_in = torch.cat([gan_disc_en_in, outputs], dim=1)
-                gen_disco = self.discriminator(outputs)
+                gen_disco = self.discriminator(disc_in)
 
                 # adversrial loss
                 real_labels = torch.FloatTensor(1).fill_(1.0)
