@@ -477,7 +477,7 @@ class REC_Processor(Processor):
             # nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
             self.optimizer.step()
 
-            self.iter_info['loss'] = loss.data.item()
+            self.iter_info['generator_loss'] = loss.data.item()
             if False:
                 self.iter_info['gan_loss'] = gan_loss.data.item()
             self.show_iter_info()

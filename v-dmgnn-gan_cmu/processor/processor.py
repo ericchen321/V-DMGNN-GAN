@@ -68,15 +68,27 @@ class Processor(IO):
     def show_iter_info(self):
         if self.meta_info['iter'] % self.arg.log_interval == 0:
             info ='\tIter {} Done.'.format(self.meta_info['iter'])
+            losses_to_show = ['generator_loss', 'discriminator_loss']
             for k, v in self.iter_info.items():
                 if isinstance(v, float):
                     info = info + ' | {}: {:.4f}'.format(k, v)
                 else:
                     info = info + ' | {}: {}'.format(k, v)
-                if k in ['loss', 'discriminator_loss']:
+                if k in losses_to_show:
+                    # plot losses separately
                     self.writer.add_scalar('check_info/'+k, v, self.meta_info['iter'])
                 else:
                     self.writer.add_scalar(k, v, self.meta_info['iter'])
+            # plot gen/discriminator loss in one figure
+            if losses_to_show[0] in self.iter_info.keys() and losses_to_show[1] in self.iter_info.keys():
+                self.writer.add_scalars(
+                    f'check_info/{losses_to_show[0]}+{losses_to_show[1]}',
+                    {
+                        losses_to_show[0]: self.iter_info[losses_to_show[0]],
+                        losses_to_show[1]: self.iter_info[losses_to_show[1]],
+                    },
+                    self.meta_info['iter']
+                )
             self.io.print_log(info)
 
             if self.arg.pavi_log:
