@@ -109,7 +109,7 @@ class Processor(IO):
             self.mask = torch.ones(25).to(self.dev)
             self.mask[10:] = 2
             for itr in range(self.arg.iter_num):
-                self.train()
+                self.train(masking_type=self.arg.masking_type)
                 if ((itr+1) % self.arg.save_interval==0) or (itr+1==self.arg.iter_num):
                     filename = 'iter{}_model.pt'.format(itr+1)
                     self.io.save_model(self.model, filename)
@@ -119,7 +119,10 @@ class Processor(IO):
                     else:
                         save_motion = False
                     self.io.print_log('eval Iteration: {}'.format(itr+1))
-                    self.test(iter_time=itr//self.arg.eval_interval, save_motion=self.arg.save_motion)
+                    self.test(
+                        iter_time=itr//self.arg.eval_interval,
+                        save_motion=self.arg.save_motion,
+                        masking_type=self.arg.masking_type)
             self.MAE = self.MAE_tensor.min(axis=0)
             self.MAE[:,-1] = self.MAE.mean(axis=-1)*13/10.
 
@@ -146,7 +149,10 @@ class Processor(IO):
             self.io.print_log('Model:   {}.'.format(self.arg.model))
             self.io.print_log('Weights: {}.'.format(self.arg.weights))
             self.io.print_log('Evaluation Start:')
-            self.test(phase=True, save_motion=self.arg.save_motion)
+            self.test(
+                phase=True,
+                save_motion=self.arg.save_motion,
+                masking_type=self.arg.masking_type)
 
         self.writer.flush()
 
@@ -185,6 +191,7 @@ class Processor(IO):
         parser.add_argument('--target_seq_len', type=int, default=25, help='which Top K accuracy will be shown')
 
         # model
+        parser.add_argument('--masking_type', default='lower-body', help='lower-body or random')
         parser.add_argument('--model', default=None, help='the model will be used')
         parser.add_argument('--model_args', action=DictAction, default=dict(), help='the arguments of model')
         parser.add_argument('--edge_weighting', type=bool, default=True, help='Add edge importance weighting')

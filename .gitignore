@@ -138,3 +138,6 @@ motion_*/
 # amass dataset
 amass/ACCAD/
 amass/SFU/
+
+# Tensorboard stuff
+v-dmgnn-gan/runs/
