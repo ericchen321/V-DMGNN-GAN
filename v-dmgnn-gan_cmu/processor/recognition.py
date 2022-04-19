@@ -206,7 +206,7 @@ class REC_Processor(Processor):
                     gan_targets,  gan_decoder_inputs_previous, \
                     gan_decoder_inputs_previous2, \
                         gan_disc_encoder_inputs = self.train_generator(
-                            mode='discriminator', masking_type="lower-body")
+                            mode='discriminator', masking_type=masking_type)
 
             self.train_decoderv3(
                 mean,
@@ -218,7 +218,7 @@ class REC_Processor(Processor):
                 gan_disc_encoder_inputs)
         
         else:
-            self.train_generator(mode='generator', masking_type="lower-body")
+            self.train_generator(mode='generator', masking_type=masking_type)
         
     def train_decoder(self, mean, var, gan_decoder_inputs, gan_targets, gan_decoder_inputs_previous, gan_decoder_inputs_previous2):
         with torch.no_grad():
