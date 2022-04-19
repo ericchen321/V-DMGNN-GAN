@@ -122,7 +122,8 @@ class Processor(IO):
                     self.test(
                         iter_time=itr//self.arg.eval_interval,
                         save_motion=self.arg.save_motion,
-                        masking_type=self.arg.masking_type)
+                        masking_type=self.arg.masking_type,
+                        fix_rand_masking_seed=False)
             self.MAE = self.MAE_tensor.min(axis=0)
             self.MAE[:,-1] = self.MAE.mean(axis=-1)*13/10.
 
@@ -150,9 +151,10 @@ class Processor(IO):
             self.io.print_log('Weights: {}.'.format(self.arg.weights))
             self.io.print_log('Evaluation Start:')
             self.test(
-                phase=True,
+                iter_time=itr//self.arg.eval_interval,
                 save_motion=self.arg.save_motion,
-                masking_type=self.arg.masking_type)
+                masking_type=self.arg.masking_type,
+                fix_rand_masking_seed=True)
 
         self.writer.flush()
 

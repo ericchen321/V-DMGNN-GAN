@@ -233,7 +233,14 @@ class REC_Processor(Processor):
         self.epoch_info['mean_loss']= np.mean(loss_value)
 
 
-    def test(self, evaluation=True, iter_time=0, save_motion=False, phase=False, masking_type="lower-body"):
+    def test(
+        self,
+        evaluation=True,
+        iter_time=0,
+        save_motion=False,
+        phase=False,
+        masking_type="lower-body",
+        fix_rand_masking_seed=False):
 
         self.model.eval()
         loss_value = []
@@ -259,7 +266,7 @@ class REC_Processor(Processor):
         ]
 
         self.io.print_log(' ')
-        print_str = "{0: <16} |".format("milliseconds")
+        print_str = "{0: <32} |".format("milliseconds")
         for ms in [41.65, 241.57, 399.84]:
             print_str = print_str + " {0:2f} |".format(ms)
         self.io.print_log(print_str)
@@ -278,9 +285,13 @@ class REC_Processor(Processor):
                     decoder_inputs
                 )
             elif masking_type == "random":
+                rand_masking_seed = None
+                if fix_rand_masking_seed:
+                    rand_masking_seed = 0
                 self.M_enc_in, self.M_dec_in = self.build_random_masking_matrices(
                     encoder_inputs,
                     decoder_inputs,
+                    seed=rand_masking_seed,
                     p=0.8
                 )
             else:
@@ -408,7 +419,7 @@ class REC_Processor(Processor):
                     # save unnormalized targets
                     np.save(save_dir+f"/motions_{action}_targets.npy", targets_denorm)
 
-                print_str = "{0: <16} |".format(action)
+                print_str = "{0: <32} |".format(action)
                 for ms_idx, ms in enumerate([4, 28, 47]):
                     if self.arg.target_seq_len >= ms+1:
                         print_str = print_str + " {0:.3f} |".format(mean_mean_errors[ms])

@@ -487,7 +487,14 @@ class REC_Processor(Processor):
 
         return mean, log_var, gan_decoder_inputs, gan_targets, gan_decoder_inputs_previous, gan_decoder_inputs_previous2, gan_disc_encoder_inputs
 
-    def test(self, evaluation=True, iter_time=0, save_motion=True, phase=False, masking_type="lower-body"):
+    def test(
+        self,
+        evaluation=True,
+        iter_time=0,
+        save_motion=False,
+        phase=False,
+        masking_type="lower-body",
+        fix_rand_masking_seed=False):
 
         self.model.eval()
         loss_value = []
@@ -515,9 +522,13 @@ class REC_Processor(Processor):
                     decoder_inputs
                 )
             elif masking_type == "random":
+                rand_masking_seed = None
+                if fix_rand_masking_seed:
+                    rand_masking_seed = 0
                 self.M_enc_in, self.M_dec_in = self.build_random_masking_matrices(
                     encoder_inputs,
                     decoder_inputs,
+                    seed=rand_masking_seed,
                     p=0.8
                 )
             else:
