@@ -140,4 +140,4 @@ amass/ACCAD/
 amass/SFU/
 
 # Tensorboard stuff
-v-dmgnn-gan_cmu/runs/
+runs/
