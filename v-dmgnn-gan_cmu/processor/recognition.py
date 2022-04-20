@@ -353,7 +353,9 @@ class REC_Processor(Processor):
         errD = 0.5*(errD_real + errD_fake)
         errD.backward()
         self.netD_optimizer.step()
-        nn.utils.clip_grad_norm_(self.discriminator.parameters(), 0.1)
+        for p in self.discriminator.parameters():
+            p.data.clamp_(-0.25, 0.25)
+        # nn.utils.clip_grad_norm_(self.discriminator.parameters(), 0.1)
         D_x_real = dis_oreal.mean().item()
 
 
@@ -476,10 +478,10 @@ class REC_Processor(Processor):
 
             self.optimizer.zero_grad()
             loss.backward()
-            # Clip weights of discriminator
-            for p in self.discriminator.parameters():
-                p.data.clamp_(-0.25, 0.25)
-            # nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
+            # # Clip weights of discriminator
+            # for p in self.discriminator.parameters():
+            #     p.data.clamp_(-0.25, 0.25)
+            nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
             self.optimizer.step()
 
             self.iter_info['generator_loss'] = loss.data.item()

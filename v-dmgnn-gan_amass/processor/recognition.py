@@ -356,7 +356,9 @@ class REC_Processor(Processor):
         errD = 0.5*(errD_real + errD_fake)
         errD.backward()
         self.netD_optimizer.step()
-        nn.utils.clip_grad_norm_(self.discriminator.parameters(), 0.1)
+        for p in self.discriminator.parameters():
+            p.data.clamp_(-0.25, 0.25)
+        # nn.utils.clip_grad_norm_(self.discriminator.parameters(), 0.1)
         D_x_real = dis_oreal.mean().item()
 
 
@@ -381,6 +383,12 @@ class REC_Processor(Processor):
                                                                self.arg.source_seq_len, 
                                                                self.arg.target_seq_len, 
                                                                len(self.dim_use))
+
+        # unmasked
+        gan_disc_encoder_inputs = torch.Tensor(encoder_inputs).float().to(self.dev) #encoder_inputs #.clone().detach().requires_grad_(True)
+        gan_disc_en_in = torch.Tensor(encoder_inputs).float().to(self.dev) # encoder_inputs_p.clone().detach().requires_grad_(True)
+
+
 
         #build masking matrices
         if masking_type == "lower-body":
@@ -430,8 +438,8 @@ class REC_Processor(Processor):
         gan_decoder_inputs_previous = decoder_inputs_previous.clone().detach().requires_grad_(True)
         gan_decoder_inputs_previous2 = decoder_inputs_previous2.clone().detach().requires_grad_(True)
         # v3
-        gan_disc_encoder_inputs = encoder_inputs_p.clone().detach().requires_grad_(True)
-        gan_disc_en_in = encoder_inputs_p.clone().detach().requires_grad_(True)
+        # gan_disc_encoder_inputs = encoder_inputs_p.clone().detach().requires_grad_(True)
+        # gan_disc_en_in = encoder_inputs_p.clone().detach().requires_grad_(True)
 
 
         outputs, mean, log_var = self.model(encoder_inputs_p,
@@ -468,16 +476,16 @@ class REC_Processor(Processor):
                 real_labels = real_labels.expand_as(gen_disco).cuda()
                 # print(real_labels.requires_grad)
                 gan_loss = self.criterion(gen_disco, real_labels)
-                loss = 0.97* loss + 0.03*gan_loss
+                loss = 0.91* loss + 0.09*gan_loss
         
 
 
             self.optimizer.zero_grad()
             loss.backward()
             # Clip weights of discriminator
-            for p in self.discriminator.parameters():
-                p.data.clamp_(-0.25, 0.25)
-            # nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
+            # for p in self.discriminator.parameters():
+            #     p.data.clamp_(-0.25, 0.25)
+            nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
             self.optimizer.step()
 
             self.iter_info['generator_loss'] = loss.data.item()
