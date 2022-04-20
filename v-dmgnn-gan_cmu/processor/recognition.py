@@ -379,6 +379,9 @@ class REC_Processor(Processor):
                                                                self.arg.target_seq_len, 
                                                                len(self.dim_use))
 
+        # unmasked
+        gan_disc_encoder_inputs = torch.Tensor(encoder_inputs).float().to(self.dev) #encoder_inputs #.clone().detach().requires_grad_(True)
+
         #build masking matrices
         if masking_type == "lower-body":
             self.M_enc_in, self.M_dec_in = self.build_lower_body_masking_matrices(
@@ -427,7 +430,7 @@ class REC_Processor(Processor):
         gan_decoder_inputs_previous = decoder_inputs_previous.clone().detach().requires_grad_(True)
         gan_decoder_inputs_previous2 = decoder_inputs_previous2.clone().detach().requires_grad_(True)
         # v3
-        gan_disc_encoder_inputs = encoder_inputs_p.clone().detach().requires_grad_(True)
+        # gan_disc_encoder_inputs = encoder_inputs_p.clone().detach().requires_grad_(True)
         gan_disc_en_in = encoder_inputs_p.clone().detach().requires_grad_(True)
 
 
@@ -465,7 +468,7 @@ class REC_Processor(Processor):
                 real_labels = real_labels.expand_as(gen_disco).cuda()
                 # print(real_labels.requires_grad)
                 gan_loss = self.criterion(gen_disco, real_labels)
-                loss = 0.97* loss + 0.03*gan_loss
+                loss = 0.91* loss + 0.09*gan_loss
         
 
 
