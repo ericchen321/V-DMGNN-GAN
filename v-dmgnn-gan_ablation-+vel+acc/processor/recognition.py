@@ -501,7 +501,7 @@ class REC_Processor(Processor):
                 real_labels = real_labels.expand_as(gen_disco).cuda()
                 # print(real_labels.requires_grad)
                 gan_loss = self.criterion(gen_disco, real_labels)
-                loss = 0.91* loss + 0.09*gan_loss
+                loss = 0.93* loss + 0.07*gan_loss
         
 
 
