@@ -2,6 +2,7 @@ import numpy as np
 import random
 import copy
 import os
+from amass_handler import AMASSDataProcessor
 
 
 def read_txt_as_data(filename):
@@ -15,10 +16,38 @@ def read_txt_as_data(filename):
     return returnArray
 
 
+# def define_actions(action):
+#     actions = ["walking","running","directing_traffic","soccer",
+#                "basketball","washwindow","jumping","basketball_signal"]
+#     if action in actions:
+#         return [action]
+#     elif action == "all":
+#         return actions
+#     else:
+#         raise( ValueError, "Unrecognized action: %d" % action )
 
-def define_actions(action):
-    actions = ["walking","running","directing_traffic","soccer",
-               "basketball","washwindow","jumping","basketball_signal"]
+
+def amass_define_actions(action):
+    r"""
+    Define_actions function for AMASS
+    """
+    actions = [
+        "Female1General_c3d",
+        "Female1Gestures_c3d",
+        "Female1Running_c3d",
+        "Female1Walking_c3d",
+        "Male1General_c3d",
+        "Male1Running_c3d",
+        "Male1Walking_c3d",
+        "Male2General_c3d",
+        "Male2MartialArtsExtended_c3d",
+        "Male2MartialArtsKicks_c3d",
+        "Male2MartialArtsPunches_c3d",
+        "Male2MartialArtsStances_c3d",
+        "Male2Running_c3d",
+        "Male2Walking_c3d",
+        "MartialArtsWalksTurns_c3d"
+    ]
     if action in actions:
         return [action]
     elif action == "all":
@@ -27,28 +56,26 @@ def define_actions(action):
         raise( ValueError, "Unrecognized action: %d" % action )
 
 
-
-def load_data(data_path, actions):
+def amass_load_data(data_path, actions):
     nactions = len(actions)
     sampled_data_set, complete_data = {}, []
     for action_idx in np.arange(nactions):
         action = actions[action_idx]
-        path='{}/{}'.format(data_path, action)
-        count=0
+        path = '{}/{}'.format(data_path, action)
+        count = 0
         for fn in os.listdir(path):
-            count=count+1
+            count = count + 1
         for examp_index in np.arange(count):
-            filename = '{}/{}/{}_{}.txt'.format(data_path, action, action, examp_index+1)
+            filename = '{}/{}/{}_{}.txt'.format(data_path, action, action, examp_index)
             action_sequence = read_txt_as_data(filename)
             t, d = action_sequence.shape
             even_indices = range(0, t, 2)
-            sampled_data_set[(action, examp_index+1, 'even')] = action_sequence[even_indices, :]
+            sampled_data_set[(action, examp_index + 1, 'even')] = action_sequence[even_indices, :]
             if len(complete_data) == 0:
                 complete_data = copy.deepcopy(action_sequence)
             else:
                 complete_data = np.append(complete_data, action_sequence, axis=0)
     return sampled_data_set, complete_data
-
 
 
 def normalization_stats(complete_data):
@@ -60,15 +87,15 @@ def normalization_stats(complete_data):
     dimensions_nonzero.extend(list(np.where(data_std >= 1e-4)[0]))
     data_std[dimensions_is_zero] = 1.0
     
-
-    dim_to_ignore = [0,  1,  2,  3,  4,  5,  6,   7,   8,   21,  22,  23,  24,  25,  26, 
-                     39, 40, 41, 60, 61, 62, 63,  64,  65,  81,  82,  83,
-                     87, 88, 89, 90, 91, 92, 108, 109, 110, 114, 115, 116]
-    dim_to_use = [9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 27, 28, 29, 30, 31,  32,  33,  34,  35,  36,  37,  38, 
-                  42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58,  59,  66,  67,  68,  69,  70,  71,  72,  73,  74, 
-                  75, 76, 77, 78, 79, 80, 84, 85, 86, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 111, 112, 113]
+    # dim_to_ignore = [0,  1,  2,  3,  4,  5,  6,   7,   8,   21,  22,  23,  24,  25,  26, 
+    #                  39, 40, 41, 60, 61, 62, 63,  64,  65,  81,  82,  83,
+    #                  87, 88, 89, 90, 91, 92, 108, 109, 110, 114, 115, 116]
+    # dim_to_use = [9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 27, 28, 29, 30, 31,  32,  33,  34,  35,  36,  37,  38, 
+    #               42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58,  59,  66,  67,  68,  69,  70,  71,  72,  73,  74, 
+    #               75, 76, 77, 78, 79, 80, 84, 85, 86, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 111, 112, 113]
+    dim_to_ignore = []
+    dim_to_use = [i for i in range(AMASSDataProcessor.BODY_POSE_INDEX)]
     return data_mean, data_std, dim_to_ignore, dim_to_use, dimensions_is_zero, dimensions_nonzero
-
 
 
 def normalize_data(data_set, data_mean, data_std, dim_to_use):
@@ -113,14 +140,14 @@ def find_indices_srnn(data_set, action):
     prefix, suffix = 50, 100
 
     idx = []
-    idx.append(rng.randint(16, T1-prefix-suffix))
-    idx.append(rng.randint(16, T2-prefix-suffix))
-    idx.append(rng.randint(16, T1-prefix-suffix))
-    idx.append(rng.randint(16, T2-prefix-suffix))
-    idx.append(rng.randint(16, T1-prefix-suffix))
-    idx.append(rng.randint(16, T2-prefix-suffix))
-    idx.append(rng.randint(16, T1-prefix-suffix))
-    idx.append(rng.randint(16, T2-prefix-suffix))
+    idx.append(rng.randint(16, T1 - prefix - suffix))
+    idx.append(rng.randint(16, T2 - prefix - suffix))
+    idx.append(rng.randint(16, T1 - prefix - suffix))
+    idx.append(rng.randint(16, T2 - prefix - suffix))
+    idx.append(rng.randint(16, T1 - prefix - suffix))
+    idx.append(rng.randint(16, T2 - prefix - suffix))
+    idx.append(rng.randint(16, T1 - prefix - suffix))
+    idx.append(rng.randint(16, T2 - prefix - suffix))
     return idx
 
 

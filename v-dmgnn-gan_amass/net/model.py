@@ -380,9 +380,9 @@ class Decoder(nn.Module):
         self.relu = nn.ReLU()
         self.leaky_relu = nn.LeakyReLU(negative_slope=0.1)
 
-        self.mask = torch.ones(78).cuda().detach()
-        self.zero_idx = torch.tensor([5, 11, 17, 23, 45, 49, 50,54, 55, 63, 67, 68 ,72, 73]).cuda().detach()
-        self.mask[self.zero_idx] = 0.
+        #self.mask = torch.ones(78).cuda().detach()
+        #self.zero_idx = torch.tensor([5, 11, 17, 23, 45, 49, 50,54, 55, 63, 67, 68 ,72, 73]).cuda().detach()
+        #self.mask[self.zero_idx] = 0.
 
     def step_forward(self, x, hidden, step):                     # inputs: [64, 21, 3]; hidden: [64, 256, 21]=N, hid, V
         N, V, d = x.size()  # NOTE by Eric: d should be 9, not 3 (as suggested above) if we're using the 1- and 2-difference
@@ -414,7 +414,7 @@ class Decoder(nn.Module):
         inputs = inputs.contiguous().view(N, T, self.V, -1)                        # [64, 1, 21, 3]
         inputs_previous = inputs_previous.contiguous().view(N, T, self.V, -1)
         inputs_previous2 = inputs_previous2.contiguous().view(N, T, self.V, -1)
-        self.mask = self.mask.view(self.V, 3)
+        #self.mask = self.mask.view(self.V, 3)
 
         for step in range(0, t):
             # NOTE by Eric: t=1 by default (get_parser() in recognition.py)
@@ -454,7 +454,8 @@ class Decoder(nn.Module):
 
         preds = torch.stack(pred_all, dim=1)                                       # [64, t, 21, 3]
         reses = torch.stack(res_all, dim=1)
-        preds = preds * self.mask
+        # NOTE by Eric: remove the mysterious mask
+        #preds = preds * self.mask
        
         return preds.transpose(1, 2).contiguous()      # [64, 21, t, 3]
 
@@ -466,6 +467,8 @@ class Discriminator(nn.Module):
     def __init__(self, n_in_enc, graph_args_j, graph_args_p, graph_args_b, edge_weighting, fusion_layer, cross_w,
                  **kwargs):
         super().__init__()
+
+        self.num_joints = 22
 
         self.graph_j = Graph_J(**graph_args_j)
         self.graph_p = Graph_P(**graph_args_p)
@@ -521,11 +524,11 @@ class Discriminator(nn.Module):
             self.eadd_s3 = nn.ParameterList([nn.Parameter(torch.zeros(self.A_b.size())) for i in range(4)])
 
         self.post_layer = nn.Sequential(
-            nn.Linear(26, 1),
+            nn.Linear(self.num_joints, 1),
             # nn.Sigmoid()
         )
         self.fcn = nn.Conv2d(256,1, kernel_size=1)
-        # self.fcn2 = nn.linear(26, 1)
+        # self.fcn2 = nn.linear(self.num_joints, 1)
         # self.sigmoid =
         # linear layer
 
@@ -583,6 +586,8 @@ class Discriminatorv2(nn.Module):
     def __init__(self, n_in_enc, graph_args_j, graph_args_p, graph_args_b, edge_weighting, fusion_layer, cross_w,
                  hidden_dim=256, **kwargs):
         super().__init__()
+
+        self.num_joints = 22
 
         self.graph_j = Graph_J(**graph_args_j)
         self.graph_p = Graph_P(**graph_args_p)
@@ -669,7 +674,7 @@ class Discriminatorv2(nn.Module):
         # self.FC_var = nn.Linear(hidden_dim, hidden_dim)
         # self.hidden = nn.ReLU()
         self.post_layer = nn.Sequential(
-            nn.Linear(26, 1),
+            nn.Linear(self.num_joints, 1),
             # nn.Sigmoid()
         )
         self.fcn = nn.Conv2d(256,1, kernel_size=1)
@@ -800,6 +805,8 @@ class Discriminatorv3(nn.Module):
     def __init__(self, n_in_dec, n_hid_dec, graph_args_j, edge_weighting=True, dropout=0.3, **kwargs):
         super().__init__()
 
+        self.num_joints = 22
+
         self.graph_j = Graph_J(**graph_args_j)
         A_j = torch.tensor(self.graph_j.A_j, dtype=torch.float32, requires_grad=False)
         self.register_buffer('A_j', A_j)
@@ -854,7 +861,7 @@ class Discriminatorv3(nn.Module):
         self.relu = nn.ReLU()
 
         self.post_layer = nn.Sequential(
-            nn.Linear(26, 1),
+            nn.Linear(self.num_joints, 1),
             # nn.Sigmoid()
         )
         self.fcn = nn.Conv2d(128,1, kernel_size=1)
@@ -892,7 +899,7 @@ class Discriminatorv3(nn.Module):
 
         inputs_previous = torch.zeros(N,1,D).cuda()
         inputs_previous2 = torch.zeros(N,1,D).cuda()
-        hidden = torch.zeros(N,256,26).cuda()
+        hidden = torch.zeros(N,256,self.num_joints).cuda()
         inputs_previous = inputs_previous.contiguous().view(N, 1, self.V, -1)
         inputs_previous2 = inputs_previous2.contiguous().view(N, 1, self.V, -1)
         t= T

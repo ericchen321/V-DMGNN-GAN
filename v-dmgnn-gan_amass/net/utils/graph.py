@@ -1,8 +1,10 @@
 import numpy as np
 
+# Note: The following class is modified for AMASS dataset
+
 class Graph_J():
 
-    def __init__(self, layout='cmu', strategy='uniform', max_hop=1, dilation=1):
+    def __init__(self, layout='amass', strategy='uniform', max_hop=1, dilation=1):
         self.max_hop = max_hop
         self.dilation = dilation
         self.get_edge(layout)
@@ -13,22 +15,21 @@ class Graph_J():
         return self.A_j
 
     def get_edge(self, layout):
-        if layout == 'cmu':
-            self.num_node = 26
+        if layout == 'amass':
+            """
+            (SMPL - excluding 2 hand joints): https://www.codetd.com/en/article/11819052
+            """
+            # the original cmu data sets neighbor_link in 1-indexing then converting to 0-indexing
+            # we will directly use 0-indexing here for amass
+            self.num_node = 22
             self_link = [(i, i) for i in range(self.num_node)]
-            # neighbor_link_ = [(1,2),(2,3),(3,4),(4,5),(1,6),(6,7),(7,8),(8,9),
-            #                   (1,10),(10,11),(11,12),(12,13),(13,14),(14,15),
-            #                   (12,16),(16,17),(17,18),(18,19),(19,20),(18,21),
-            #                   (12,22),(22,23),(23,24),(24,25),(25,26),(24,27)]
-            neighbor_link_ = [(1,2),(2,3),(3,4),(5,6),(6,7),(7,8),(1,9),(5,9),
-                              (9,10),(10,11),(11,12),(12,13),(13,14),
-                              (11,15),(15,16),(16,17),(17,18),(18,19),(17,20),
-                              (12,21),(21,22),(22,23),(23,24),(24,25),(23,26)]
+            neighbor_link = [(0, 1), (1, 4), (4, 7), (7, 10), (0, 2), (2, 5), (5, 8), (8, 11),
+                             (0, 3), (3, 6), (6, 9), (9, 13), (13, 16), (16, 18), (18, 20),
+                             (9, 14), (14, 17), (17, 19), (19, 21),
+                             (9, 12), (12, 15)]
 
-            neighbor_link = [(i-1,j-1) for (i,j) in neighbor_link_]
             self.edge = self_link + neighbor_link
-            self.center = 10-1
-            
+            self.center = 6
 
     def get_adjacency(self, strategy):
         valid_hop = range(0, self.max_hop + 1, self.dilation)
@@ -72,7 +73,7 @@ class Graph_J():
 
 class Graph_P():
     
-    def __init__(self, layout='cmu', strategy='uniform', max_hop=1, dilation=1):
+    def __init__(self, layout='amass', strategy='uniform', max_hop=1, dilation=1):
         self.max_hop = max_hop
         self.dilation = dilation
         self.get_edge(layout)
@@ -83,7 +84,7 @@ class Graph_P():
         return self.A_p
 
     def get_edge(self, layout):
-        if layout == 'cmu':
+        if layout == 'amass':
             self.num_node = 10
             self_link = [(i, i) for i in range(self.num_node)]
             neighbor_link_ = [(1,2),(3,4),(1,5),(3,5),(5,6),(5,7),(7,8),(5,9),(9,10)]
@@ -133,7 +134,7 @@ class Graph_P():
 
 class Graph_B():
     
-    def __init__(self, layout='cmu', strategy='uniform', max_hop=1, dilation=1):
+    def __init__(self, layout='amass', strategy='uniform', max_hop=1, dilation=1):
         self.max_hop = max_hop
         self.dilation = dilation
         self.get_edge(layout)
@@ -144,7 +145,7 @@ class Graph_B():
         return self.A_b
 
     def get_edge(self, layout):
-        if layout == 'cmu':
+        if layout == 'amass':
             self.num_node = 5
             self_link = [(i, i) for i in range(self.num_node)]
             neighbor_link_ = [(1,3),(2,3),(3,4),(3,5)]
