@@ -381,6 +381,8 @@ class REC_Processor(Processor):
 
         # unmasked
         gan_disc_encoder_inputs = torch.Tensor(encoder_inputs).float().to(self.dev) #encoder_inputs #.clone().detach().requires_grad_(True)
+        gan_disc_en_in = torch.Tensor(encoder_inputs).float().to(self.dev) # encoder_inputs_p.clone().detach().requires_grad_(True)
+
 
         #build masking matrices
         if masking_type == "lower-body":
@@ -431,7 +433,7 @@ class REC_Processor(Processor):
         gan_decoder_inputs_previous2 = decoder_inputs_previous2.clone().detach().requires_grad_(True)
         # v3
         # gan_disc_encoder_inputs = encoder_inputs_p.clone().detach().requires_grad_(True)
-        gan_disc_en_in = encoder_inputs_p.clone().detach().requires_grad_(True)
+        # gan_disc_en_in = encoder_inputs_p.clone().detach().requires_grad_(True)
 
 
         outputs, mean, log_var = self.model(encoder_inputs_p,
