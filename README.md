@@ -8,9 +8,28 @@ Refer to here for [the readme file](README_DMGNN.md) from the [original DMGNN pa
 # Authors
 [Anushree Bannadabhavi*](https://www.linkedin.com/in/anushree-bannadabhavi-585435122/?originalSubdomain=ca), [Guanxiong Chen*](https://www.linkedin.com/in/guanxiongchen/), [Yunpeng (Larry) Liu*](https://www.linkedin.com/in/larry-liu-323b51126/), [Kaitai (Alan) Tong*](https://www.linkedin.com/in/alan-tong/).
 
-\* Authors listed by alphabetical order of last names. Equal contribution from all.
+* Authors listed by alphabetical order of last names. Equal contribution from all.
 
-# Usage
-## Running V-DMGNN-GAN
+# Instruction for training our GAN model
+### CMU dataset random masking
+```
+cd v-dmgnn-gan_cmu
+python main.py prediction -c ../config/CMU/v-dmgnn-gan/train_random.yaml
+```
+### ACCAD dataset lower body masking
+```
+cd v-dmgnn-gan_amass
+python main.py prediction -c config/ACCAD/v-dmgnn-gan/train_lower-body.yaml
+```
 
-## Running DMGNN
+# Instruction for evaluating our GAN model
+### CMU dataset random masking
+```
+cd v-dmgnn-gan_cmu
+python main.py prediction -c ../config/CMU/v-dmgnn-gan/test_random.yaml
+```
+### ACCAD dataset lower body masking
+```
+cd v-dmgnn-gan_amass
+python main.py prediction -c config/ACCAD/v-dmgnn-gan/test_lower-body.yaml
+```
