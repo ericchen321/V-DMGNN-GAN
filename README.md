@@ -9,3 +9,9 @@ Refer to here for [the readme file](README_DMGNN.md) from the [original DMGNN pa
 [Anushree Bannadabhavi*](https://www.linkedin.com/in/anushree-bannadabhavi-585435122/?originalSubdomain=ca), [Guanxiong Chen*](https://www.linkedin.com/in/guanxiongchen/), [Yunpeng (Larry) Liu*](https://www.linkedin.com/in/larry-liu-323b51126/), [Kaitai (Alan) Tong*](https://www.linkedin.com/in/alan-tong/).
 
 * Authors listed by alphabetical order of last names. Equal contribution from all.
+
+# Instruction for training our GAN model
+### CMU dataset
+```
+python main.py prediction -c ../config/CMU/v-dmgnn-gan/train_random.yaml
+```
